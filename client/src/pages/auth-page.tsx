@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAuth, generateKeypair, isValidPrivateKey } from "@/hooks/use-auth";
+import { useAuth, isValidAccessKey, formatAccessKey } from "@/hooks/use-auth";
 import { Redirect } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,19 +10,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Copy, Download, Eye, EyeOff, Shield, AlertTriangle } from "lucide-react";
+import { Loader2, Copy, Download, Eye, EyeOff, Shield, AlertTriangle, Key } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function AuthPage() {
-  const { user, challengeLoginMutation, registerMutation } = useAuth();
+  const { user, loginMutation, registerMutation } = useAuth();
   const { toast } = useToast();
-  const [loginForm, setLoginForm] = useState({ username: "", privateKey: "" });
+  const [loginForm, setLoginForm] = useState({ username: "", accessKey: "" });
   const [registerForm, setRegisterForm] = useState({ username: "", referredBy: "" });
-  const [showPrivateKey, setShowPrivateKey] = useState(false);
-  const [showLoginPrivateKey, setShowLoginPrivateKey] = useState(false);
+  const [showLoginAccessKey, setShowLoginAccessKey] = useState(false);
   
-  // Key generation state
-  const [generatedKeys, setGeneratedKeys] = useState<{ publicKey: string; privateKey: string } | null>(null);
+  // Access key state
+  const [generatedAccessKey, setGeneratedAccessKey] = useState<string | null>(null);
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [keyConfirmation, setKeyConfirmation] = useState({
     saved: false,
@@ -34,19 +33,32 @@ export default function AuthPage() {
     return <Redirect to="/" />;
   }
 
-  const handleGenerateKeys = async () => {
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!registerForm.username.trim()) {
+      toast({
+        title: "Username required",
+        description: "Please enter a username",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     try {
-      console.log("Starting key generation...");
-      const keys = await generateKeypair();
-      console.log("Keys generated successfully:", keys);
-      setGeneratedKeys(keys);
+      const result = await registerMutation.mutateAsync({
+        username: registerForm.username.trim(),
+        referredBy: registerForm.referredBy.trim() || undefined,
+      });
+      
+      // Registration successful - show the access key
+      setGeneratedAccessKey(result.accessKey);
       setShowKeyModal(true);
       setKeyConfirmation({ saved: false, lastSixChars: "" });
-    } catch (error) {
-      console.error("Key generation error:", error);
+    } catch (error: any) {
       toast({
-        title: "Key generation failed",
-        description: `Error: ${(error as Error).message}`,
+        title: "Registration failed",
+        description: error.message || "Failed to create account",
         variant: "destructive",
       });
     }
@@ -61,15 +73,15 @@ export default function AuthPage() {
     });
   };
 
-  const downloadPrivateKey = () => {
-    if (!generatedKeys) return;
+  const downloadAccessKey = () => {
+    if (!generatedAccessKey) return;
     
-    const content = `GBTC Mining Platform - Private Key
+    const content = `GBTC Mining Platform - Access Key
 ⚠️  CRITICAL SECURITY WARNING ⚠️
 
-This is your PRIVATE KEY for GBTC Mining Platform account: ${registerForm.username}
+This is your ACCESS KEY for GBTC Mining Platform account: ${registerForm.username}
 
-Private Key: ${generatedKeys.privateKey}
+Access Key: ${generatedAccessKey}
 
 🔒 SECURITY INSTRUCTIONS:
 • Keep this key absolutely secret - NEVER share it with anyone
@@ -80,7 +92,7 @@ Private Key: ${generatedKeys.privateKey}
 
 Account Details:
 • Username: ${registerForm.username}
-• Public Key: ${generatedKeys.publicKey}
+• Access Key: ${generatedAccessKey}
 • Generated: ${new Date().toISOString()}
 
 ⚠️  If you suspect this key has been compromised, contact support immediately.
@@ -90,46 +102,38 @@ Account Details:
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `gbtc-private-key-${registerForm.username}.txt`;
+    a.download = `gbtc-access-key-${registerForm.username}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
     toast({
-      title: "Private key downloaded",
-      description: "Your private key has been saved to a text file. Store it securely!",
+      title: "Access key downloaded",
+      description: "Your access key has been saved to a text file. Store it securely!",
     });
   };
 
   const handleCompleteRegistration = () => {
-    if (!generatedKeys || !keyConfirmation.saved || keyConfirmation.lastSixChars !== generatedKeys.privateKey.slice(-6)) {
+    if (!generatedAccessKey || !keyConfirmation.saved || keyConfirmation.lastSixChars !== generatedAccessKey.slice(-6)) {
       return;
     }
     
-    registerMutation.mutate({
-      username: registerForm.username,
-      publicKey: generatedKeys.publicKey,
-      referredBy: registerForm.referredBy || undefined
-    });
-    
+    // Close modal and redirect to mining page
     setShowKeyModal(false);
+    toast({
+      title: "Registration complete!",
+      description: "You can now start mining. Remember to keep your access key safe!",
+    });
   };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (loginForm.username && loginForm.privateKey && isValidPrivateKey(loginForm.privateKey)) {
-      challengeLoginMutation.mutate({
+    if (loginForm.username && loginForm.accessKey && isValidAccessKey(loginForm.accessKey)) {
+      loginMutation.mutate({
         username: loginForm.username,
-        privateKey: loginForm.privateKey
+        accessKey: loginForm.accessKey
       });
-    }
-  };
-
-  const handleRegister = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (registerForm.username) {
-      handleGenerateKeys();
     }
   };
 
@@ -146,7 +150,7 @@ Account Details:
               </div>
             </div>
             <h1 className="text-2xl font-bold text-white mb-2">GBTC Mining Platform</h1>
-            <p className="text-gray-400 text-sm">Secure Keypair Authentication</p>
+            <p className="text-gray-400 text-sm">Secure Access Key Authentication</p>
           </div>
 
           {/* Auth Tabs */}
@@ -160,11 +164,11 @@ Account Details:
               <Card className="border-[#f7931a]/20 bg-gray-950">
                 <CardHeader>
                   <CardTitle className="text-center text-white flex items-center justify-center gap-2">
-                    <Shield className="w-5 h-5" />
-                    Sign In with Private Key
+                    <Key className="w-5 h-5" />
+                    Sign In with Access Key
                   </CardTitle>
                   <p className="text-xs text-center text-gray-400">
-                    Enter your username and private key to access your account
+                    Enter your username and access key to access your account
                   </p>
                 </CardHeader>
                 <CardContent>
@@ -184,54 +188,54 @@ Account Details:
                       />
                     </div>
                     <div>
-                      <Label htmlFor="login-private-key" className="flex items-center gap-2">
-                        Private Key
-                        <span className="text-red-400 text-xs">(64 hex characters)</span>
+                      <Label htmlFor="login-access-key" className="flex items-center gap-2">
+                        Access Key
+                        <span className="text-[#f7931a] text-xs">(GBTC-XXXXX-XXXXX-XXXXX-XXXXX)</span>
                       </Label>
                       <div className="relative">
                         <Textarea
-                          id="login-private-key"
-                          placeholder="Enter your 64-character private key"
-                          value={loginForm.privateKey}
+                          id="login-access-key"
+                          placeholder="Enter your GBTC access key"
+                          value={loginForm.accessKey}
                           onChange={(e) => {
-                            const value = e.target.value.replace(/[^a-fA-F0-9]/g, '').slice(0, 64);
-                            setLoginForm(prev => ({ ...prev, privateKey: value }));
+                            const value = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+                            setLoginForm(prev => ({ ...prev, accessKey: value }));
                           }}
                           className={`bg-black border-gray-800 font-mono text-sm resize-none ${
-                            showLoginPrivateKey ? '' : 'text-security-disc'
+                            showLoginAccessKey ? '' : 'text-security-disc'
                           }`}
-                          style={showLoginPrivateKey ? {} : { WebkitTextSecurity: 'disc', textSecurity: 'disc' } as any}
-                          rows={3}
+                          style={showLoginAccessKey ? {} : { WebkitTextSecurity: 'disc', textSecurity: 'disc' } as any}
+                          rows={2}
                           required
-                          data-testid="input-login-private-key"
+                          data-testid="input-login-access-key"
                         />
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
                           className="absolute top-2 right-2 h-6 w-6 p-0 text-gray-400 hover:text-white"
-                          onClick={() => setShowLoginPrivateKey(!showLoginPrivateKey)}
+                          onClick={() => setShowLoginAccessKey(!showLoginAccessKey)}
                           data-testid="button-toggle-login-key-visibility"
                         >
-                          {showLoginPrivateKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          {showLoginAccessKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </Button>
                       </div>
-                      {loginForm.privateKey && !isValidPrivateKey(loginForm.privateKey) && (
+                      {loginForm.accessKey && !isValidAccessKey(loginForm.accessKey) && (
                         <p className="text-red-400 text-xs mt-1">
-                          Private key must be exactly 64 hexadecimal characters
+                          Access key must be in format: GBTC-XXXXX-XXXXX-XXXXX-XXXXX
                         </p>
                       )}
                     </div>
                     <Button 
                       type="submit" 
                       className="w-full bg-[#f7931a] hover:bg-[#ff9416] text-black font-bold"
-                      disabled={challengeLoginMutation.isPending || !isValidPrivateKey(loginForm.privateKey)}
+                      disabled={loginMutation.isPending || !isValidAccessKey(loginForm.accessKey)}
                       data-testid="button-login"
                     >
-                      {challengeLoginMutation.isPending ? (
+                      {loginMutation.isPending ? (
                         <Loader2 className="w-4 h-4 animate-spin mr-2" />
                       ) : (
-                        <Shield className="w-4 h-4 mr-2" />
+                        <Key className="w-4 h-4 mr-2" />
                       )}
                       Sign In Securely
                     </Button>
@@ -248,7 +252,7 @@ Account Details:
                     Create Secure Account
                   </CardTitle>
                   <p className="text-xs text-center text-gray-500 mt-2">
-                    Generate cryptographic keypair for maximum security
+                    Generate unique access key for maximum security
                   </p>
                 </CardHeader>
                 <CardContent>
@@ -258,10 +262,10 @@ Account Details:
                     <AlertDescription className="text-sm">
                       <strong className="text-red-400">CRITICAL SECURITY WARNING</strong>
                       <div className="mt-2 space-y-1 text-gray-300">
-                        <p>• Your private key is your ONLY way to access your account</p>
+                        <p>• Your access key is your ONLY way to access your account</p>
                         <p>• There is NO password recovery or account reset option</p>
-                        <p>• If you lose your private key, you lose your account forever</p>
-                        <p>• NEVER share your private key with anyone</p>
+                        <p>• If you lose your access key, you lose your account forever</p>
+                        <p>• NEVER share your access key with anyone</p>
                         <p>• Store it in multiple secure locations</p>
                       </div>
                     </AlertDescription>
@@ -308,14 +312,14 @@ Account Details:
                       type="submit" 
                       className="w-full bg-[#f7931a] hover:bg-[#ff9416] text-black font-bold"
                       disabled={registerMutation.isPending || !registerForm.username}
-                      data-testid="button-generate-keys"
+                      data-testid="button-register"
                     >
                       {registerMutation.isPending ? (
                         <Loader2 className="w-4 h-4 animate-spin mr-2" />
                       ) : (
                         <Shield className="w-4 h-4 mr-2" />
                       )}
-                      Generate Cryptographic Keys
+                      Generate Secure Access Key
                     </Button>
                   </form>
                 </CardContent>
@@ -325,13 +329,13 @@ Account Details:
         </div>
       </div>
 
-      {/* Private Key Display Modal */}
+      {/* Access Key Display Modal */}
       <Dialog open={showKeyModal} onOpenChange={() => {}}>
-        <DialogContent className="max-w-2xl bg-gray-950 border-red-500/20" data-testid="modal-private-key">
+        <DialogContent className="max-w-2xl bg-gray-950 border-red-500/20" data-testid="modal-access-key">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-400">
               <AlertTriangle className="w-5 h-5" />
-              Your Private Key - SAVE THIS NOW!
+              Your Access Key - SAVE THIS NOW!
             </DialogTitle>
           </DialogHeader>
           
@@ -340,69 +344,33 @@ Account Details:
             <Alert className="border-red-500 bg-red-950/50">
               <AlertTriangle className="h-4 w-4 text-red-500" />
               <AlertDescription className="text-red-200">
-                <strong>THIS IS YOUR ONLY CHANCE TO SEE YOUR PRIVATE KEY!</strong>
+                <strong>THIS IS YOUR ONLY CHANCE TO SEE YOUR ACCESS KEY!</strong>
                 <br />
                 Once you close this window, we cannot recover it for you.
               </AlertDescription>
             </Alert>
 
-            {/* Private Key Display */}
+            {/* Access Key Display */}
             <div className="space-y-3">
-              <Label className="text-red-400 font-semibold">🔐 Your Private Key:</Label>
+              <Label className="text-[#f7931a] font-semibold flex items-center gap-2">
+                <Key className="w-4 h-4" />
+                Your Access Key:
+              </Label>
               <div className="relative">
                 <Textarea
-                  value={generatedKeys?.privateKey || ""}
+                  value={formatAccessKey(generatedAccessKey || "")}
                   readOnly
-                  className={`bg-black border-yellow-500 font-mono text-yellow-400 text-sm ${
-                    showPrivateKey ? '' : 'text-security-disc'
-                  }`}
-                  style={showPrivateKey ? {} : { WebkitTextSecurity: 'disc', textSecurity: 'disc' } as any}
-                  rows={3}
-                  data-testid="textarea-private-key"
-                />
-                <div className="absolute top-2 right-2 flex gap-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 text-gray-400 hover:text-white"
-                    onClick={() => setShowPrivateKey(!showPrivateKey)}
-                    data-testid="button-toggle-key-visibility"
-                  >
-                    {showPrivateKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 text-gray-400 hover:text-white"
-                    onClick={() => copyToClipboard(generatedKeys?.privateKey || "", "Private key")}
-                    data-testid="button-copy-private-key"
-                  >
-                    <Copy className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Public Key Display */}
-            <div className="space-y-3">
-              <Label className="text-green-400 font-semibold">🔓 Your Public Key:</Label>
-              <div className="relative">
-                <Textarea
-                  value={generatedKeys?.publicKey || ""}
-                  readOnly
-                  className="bg-black border-green-500 font-mono text-green-400 text-sm"
+                  className="bg-black border-[#f7931a] font-mono text-[#f7931a] text-lg font-bold text-center"
                   rows={2}
-                  data-testid="textarea-public-key"
+                  data-testid="textarea-access-key"
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
                   className="absolute top-2 right-2 h-6 w-6 p-0 text-gray-400 hover:text-white"
-                  onClick={() => copyToClipboard(generatedKeys?.publicKey || "", "Public key")}
-                  data-testid="button-copy-public-key"
+                  onClick={() => copyToClipboard(generatedAccessKey || "", "Access key")}
+                  data-testid="button-copy-access-key"
                 >
                   <Copy className="w-4 h-4" />
                 </Button>
@@ -411,12 +379,12 @@ Account Details:
 
             {/* Download Option */}
             <Button
-              onClick={downloadPrivateKey}
+              onClick={downloadAccessKey}
               className="w-full bg-blue-600 hover:bg-blue-700"
               data-testid="button-download-key"
             >
               <Download className="w-4 h-4 mr-2" />
-              Download Private Key as Text File
+              Download Access Key as Text File
             </Button>
 
             {/* Confirmation Steps */}
@@ -431,7 +399,7 @@ Account Details:
                   data-testid="checkbox-key-saved"
                 />
                 <Label htmlFor="key-saved" className="text-sm leading-relaxed">
-                  I have safely stored my private key in multiple secure locations 
+                  I have safely stored my access key in multiple secure locations 
                   (password manager, encrypted file, and/or written down offline)
                 </Label>
               </div>
@@ -439,7 +407,7 @@ Account Details:
               {keyConfirmation.saved && (
                 <div className="space-y-2">
                   <Label htmlFor="confirm-key" className="text-sm text-yellow-400">
-                    Type the last 6 characters of your private key to confirm:
+                    Type the last 6 characters of your access key to confirm:
                   </Label>
                   <Input
                     id="confirm-key"
@@ -447,7 +415,7 @@ Account Details:
                     placeholder="Last 6 characters"
                     value={keyConfirmation.lastSixChars}
                     onChange={(e) => {
-                      const value = e.target.value.replace(/[^a-fA-F0-9]/g, '').slice(0, 6);
+                      const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
                       setKeyConfirmation(prev => ({ ...prev, lastSixChars: value }));
                     }}
                     className="bg-black border-yellow-500 font-mono text-center"
@@ -463,7 +431,7 @@ Account Details:
               onClick={handleCompleteRegistration}
               disabled={
                 !keyConfirmation.saved || 
-                keyConfirmation.lastSixChars !== (generatedKeys?.privateKey.slice(-6) || "") ||
+                keyConfirmation.lastSixChars !== (generatedAccessKey?.slice(-6) || "") ||
                 registerMutation.isPending
               }
               className="w-full bg-[#f7931a] hover:bg-[#ff9416] text-black font-bold"
@@ -472,7 +440,7 @@ Account Details:
               {registerMutation.isPending ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
               ) : null}
-              Complete Registration
+              Complete Registration & Start Mining
             </Button>
           </div>
         </DialogContent>

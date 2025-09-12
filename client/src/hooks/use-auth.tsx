@@ -4,49 +4,29 @@ import {
   useMutation,
   UseMutationResult,
 } from "@tanstack/react-query";
-import { insertUserSchema, User as SelectUser, InsertUser } from "@shared/schema";
+import { User as SelectUser } from "@shared/schema";
 import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import * as ed25519 from "@noble/ed25519";
-import { hexToBytes, bytesToHex } from "@noble/hashes/utils";
-import { sha512 } from "@noble/hashes/sha2";
-
-// Required initialization for @noble/ed25519
-(ed25519.etc as any).sha512Sync = (...m: Uint8Array[]) => sha512(ed25519.etc.concatBytes(...m));
 
 type AuthContextType = {
   user: SelectUser | null;
   isLoading: boolean;
   error: Error | null;
-  challengeLoginMutation: UseMutationResult<SelectUser, Error, ChallengeLoginData>;
+  loginMutation: UseMutationResult<SelectUser, Error, LoginData>;
   logoutMutation: UseMutationResult<void, Error, void>;
-  registerMutation: UseMutationResult<SelectUser, Error, RegisterData>;
-  getChallengeForLogin: (username: string) => Promise<{ nonce: string }>;
+  registerMutation: UseMutationResult<SelectUser & { accessKey: string }, Error, RegisterData>;
 };
 
-type ChallengeLoginData = {
+type LoginData = {
   username: string;
-  privateKey: string; // Will be used to sign the challenge
+  accessKey: string;
 };
 
 type RegisterData = {
   username: string;
-  publicKey: string;
   referredBy?: string;
 };
-
-// Helper function to sign a message with Ed25519 private key
-async function signMessage(privateKeyHex: string, message: string): Promise<string> {
-  try {
-    const privateKey = hexToBytes(privateKeyHex);
-    const messageBytes = new TextEncoder().encode(message);
-    const signature = await ed25519.sign(messageBytes, privateKey);
-    return bytesToHex(signature);
-  } catch (error) {
-    throw new Error('Failed to sign message. Please check your private key format.');
-  }
-}
 
 export const AuthContext = createContext<AuthContextType | null>(null);
 
@@ -65,30 +45,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     gcTime: 300000 // Cache user for better performance
   });
 
-  // Function to get login challenge (nonce)
-  const getChallengeForLogin = async (username: string): Promise<{ nonce: string }> => {
-    const res = await apiRequest("POST", "/api/login/challenge", { username });
-    if (!res.ok) {
-      const error = await res.json();
-      throw new Error(error.message || 'Failed to get login challenge');
-    }
-    return await res.json();
-  };
-
-  const challengeLoginMutation = useMutation({
-    mutationFn: async ({ username, privateKey }: ChallengeLoginData) => {
-      // Step 1: Get challenge nonce
-      const { nonce } = await getChallengeForLogin(username);
-      
-      // Step 2: Sign the challenge message
-      const message = `GBTC:Login:${username}:${nonce}`;
-      const signature = await signMessage(privateKey, message);
-      
-      // Step 3: Verify signature with server
-      const res = await apiRequest("POST", "/api/login/verify", {
+  const loginMutation = useMutation({
+    mutationFn: async ({ username, accessKey }: LoginData) => {
+      const res = await apiRequest("POST", "/api/login", {
         username,
-        signature,
-        nonce
+        accessKey
       });
       
       if (!res.ok) {
@@ -125,13 +86,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       return await res.json();
     },
-    onSuccess: (user: SelectUser) => {
-      queryClient.setQueryData(["/api/user"], user);
-      // Redirect to mining page after successful registration
-      setLocation("/mining");
+    onSuccess: (userWithKey: SelectUser & { accessKey: string }) => {
+      // Don't redirect immediately after registration - let user save access key first
+      queryClient.setQueryData(["/api/user"], userWithKey);
       toast({
         title: "Account created successfully",
-        description: `Welcome to GBTC Mining, ${user.username}!`,
+        description: `Welcome to GBTC Mining, ${userWithKey.username}!`,
       });
     },
     onError: (error: Error) => {
@@ -173,10 +133,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user: user ?? null,
         isLoading,
         error,
-        challengeLoginMutation,
+        loginMutation,
         logoutMutation,
         registerMutation,
-        getChallengeForLogin,
       }}
     >
       {children}
@@ -192,31 +151,20 @@ export function useAuth() {
   return context;
 }
 
-// Utility function to generate Ed25519 keypair
-export async function generateKeypair(): Promise<{ publicKey: string; privateKey: string }> {
-  const privateKeyBytes = ed25519.utils.randomSecretKey();
-  const publicKeyBytes = await ed25519.getPublicKey(privateKeyBytes);
-  
-  return {
-    publicKey: bytesToHex(publicKeyBytes),
-    privateKey: bytesToHex(privateKeyBytes)
-  };
-}
-
-// Utility function to validate private key format
-export function isValidPrivateKey(privateKey: string): boolean {
+// Utility function to validate access key format
+export function isValidAccessKey(accessKey: string): boolean {
   try {
-    return /^[a-fA-F0-9]{64}$/.test(privateKey);
+    // GBTC-XXXXX-XXXXX-XXXXX-XXXXX format
+    return /^GBTC-[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(accessKey);
   } catch {
     return false;
   }
 }
 
-// Utility function to validate public key format
-export function isValidPublicKey(publicKey: string): boolean {
-  try {
-    return /^[a-fA-F0-9]{64}$/.test(publicKey);
-  } catch {
-    return false;
+// Utility function to format access key for display
+export function formatAccessKey(accessKey: string): string {
+  if (accessKey && accessKey.length === 29 && accessKey.startsWith('GBTC-')) {
+    return accessKey;
   }
+  return accessKey;
 }
