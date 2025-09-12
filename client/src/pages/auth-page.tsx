@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth, isValidAccessKey, formatAccessKey } from "@/hooks/use-auth";
-import { Redirect } from "wouter";
+import { Redirect, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,12 +10,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Copy, Download, Eye, EyeOff, Shield, AlertTriangle, Key } from "lucide-react";
+import { Loader2, Copy, Download, Eye, EyeOff, Shield, AlertTriangle, Key, ArrowRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [loginForm, setLoginForm] = useState({ username: "", accessKey: "" });
   const [registerForm, setRegisterForm] = useState({ username: "", referredBy: "" });
   const [showLoginAccessKey, setShowLoginAccessKey] = useState(false);
@@ -115,16 +116,17 @@ Account Details:
   };
 
   const handleCompleteRegistration = () => {
-    if (!generatedAccessKey || !keyConfirmation.saved || keyConfirmation.lastSixChars !== generatedAccessKey.slice(-6)) {
-      return;
-    }
-    
     // Close modal and redirect to mining page
     setShowKeyModal(false);
     toast({
       title: "Registration complete!",
-      description: "You can now start mining. Remember to keep your access key safe!",
+      description: "Welcome to GBTC Mining! Starting your mining journey...",
     });
+    
+    // Redirect to mining page after a short delay
+    setTimeout(() => {
+      setLocation("/mining");
+    }, 1000);
   };
 
   const handleLogin = (e: React.FormEvent) => {
@@ -387,61 +389,38 @@ Account Details:
               Download Access Key as Text File
             </Button>
 
-            {/* Confirmation Steps */}
-            <div className="space-y-4 border-t border-gray-700 pt-4">
-              <div className="flex items-start space-x-3">
-                <Checkbox
-                  id="key-saved"
-                  checked={keyConfirmation.saved}
-                  onCheckedChange={(checked) => 
-                    setKeyConfirmation(prev => ({ ...prev, saved: checked as boolean }))
-                  }
-                  data-testid="checkbox-key-saved"
-                />
-                <Label htmlFor="key-saved" className="text-sm leading-relaxed">
-                  I have safely stored my access key in multiple secure locations 
-                  (password manager, encrypted file, and/or written down offline)
-                </Label>
-              </div>
-
-              {keyConfirmation.saved && (
-                <div className="space-y-2">
-                  <Label htmlFor="confirm-key" className="text-sm text-yellow-400">
-                    Type the last 6 characters of your access key to confirm:
-                  </Label>
-                  <Input
-                    id="confirm-key"
-                    type="text"
-                    placeholder="Last 6 characters"
-                    value={keyConfirmation.lastSixChars}
-                    onChange={(e) => {
-                      const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
-                      setKeyConfirmation(prev => ({ ...prev, lastSixChars: value }));
-                    }}
-                    className="bg-black border-yellow-500 font-mono text-center"
-                    maxLength={6}
-                    data-testid="input-confirm-key"
-                  />
-                </div>
-              )}
+            {/* Simplified Instructions */}
+            <div className="border-t border-gray-700 pt-4">
+              <Alert className="border-yellow-500/20 bg-yellow-950/30">
+                <Key className="h-4 w-4 text-yellow-500" />
+                <AlertDescription className="text-yellow-200">
+                  <strong>📋 Copy your access key now!</strong>
+                  <br />
+                  You'll need it to login. Store it somewhere safe - we cannot recover it.
+                </AlertDescription>
+              </Alert>
             </div>
 
-            {/* Complete Registration */}
-            <Button
-              onClick={handleCompleteRegistration}
-              disabled={
-                !keyConfirmation.saved || 
-                keyConfirmation.lastSixChars !== (generatedAccessKey?.slice(-6) || "") ||
-                registerMutation.isPending
-              }
-              className="w-full bg-[#f7931a] hover:bg-[#ff9416] text-black font-bold"
-              data-testid="button-complete-registration"
-            >
-              {registerMutation.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              ) : null}
-              Complete Registration & Start Mining
-            </Button>
+            {/* Complete Registration - Simplified */}
+            <div className="space-y-3">
+              <Button
+                onClick={() => copyToClipboard(generatedAccessKey || "", "Access key copied!")}
+                className="w-full bg-green-600 hover:bg-green-700 text-white font-bold"
+                data-testid="button-copy-key"
+              >
+                <Copy className="w-4 h-4 mr-2" />
+                📋 COPY ACCESS KEY
+              </Button>
+              
+              <Button
+                onClick={handleCompleteRegistration}
+                className="w-full bg-[#f7931a] hover:bg-[#ff9416] text-black font-bold"
+                data-testid="button-complete-registration"
+              >
+                <ArrowRight className="w-4 h-4 mr-2" />
+                I'VE COPIED IT - START MINING!
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
