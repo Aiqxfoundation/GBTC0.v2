@@ -87,11 +87,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return await res.json();
     },
     onSuccess: (userWithKey: SelectUser & { accessKey: string }) => {
-      // Don't redirect immediately after registration - let user save access key first
-      queryClient.setQueryData(["/api/user"], userWithKey);
+      // Don't auto-login user - they need to see access key first, then manually login
       toast({
         title: "Account created successfully",
-        description: `Welcome to GBTC Mining, ${userWithKey.username}!`,
+        description: `Your access key has been generated. Please copy it safely!`,
       });
     },
     onError: (error: Error) => {

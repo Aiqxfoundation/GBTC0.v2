@@ -116,17 +116,20 @@ Account Details:
   };
 
   const handleCompleteRegistration = () => {
-    // Close modal and redirect to mining page
+    // Close modal and switch to login tab - user must login manually
     setShowKeyModal(false);
     toast({
-      title: "Registration complete!",
-      description: "Welcome to GBTC Mining! Starting your mining journey...",
+      title: "Access key saved!",
+      description: "Now please login with your username and access key to start mining.",
     });
     
-    // Redirect to mining page after a short delay
+    // Switch to login tab
     setTimeout(() => {
-      setLocation("/mining");
-    }, 1000);
+      const loginTab = document.querySelector('[value="login"]') as HTMLButtonElement;
+      if (loginTab) {
+        loginTab.click();
+      }
+    }, 500);
   };
 
   const handleLogin = (e: React.FormEvent) => {
