@@ -1,0 +1,269 @@
+
+1) Core Idea (Risk-sharing, not interest)
+
+Users BTC + GBTC Hash lock karte hain.
+
+GBTC Hash = virtual hashrate units (e.g., 1 GBTC Hash = k TH/s).
+
+Pool ka “expected mined BTC” Bitcoin network stats se nikalta hai.
+
+Har user ko pool share ke mutabiq reward milta hai. Koi fixed APR/APY nahin.
+
+
+
+---
+
+2) Notation & Parameters
+
+R_block = block reward (aaj kal 3.125 BTC).
+
+B_day = blocks per day (≈ 144).
+
+H_net = network hashrate (e.g., 600 EH/s = 600×10^18 H/s).
+
+k = hashrate per 1 GBTC Hash (project constant; e.g., k = 0.1 TH/s).
+
+H_user = user’s virtual hashrate = GBTC_hash_amount × k.
+
+H_pool = Σ H_user (all users).
+
+L = lock multiplier (e.g., 1.0 for 1 mo, 1.1 for 6 mo, 1.2 for 12 mo, 1.3 for 24 mo).
+
+B_boost = BTC stake boost factor (optional, e.g., piecewise function).
+
+fee = platform fee on rewards (e.g., 5%).
+
+ref_cut = referral cut from reward (e.g., 10% of referee’s reward, paid from platform side or split—your choice).
+
+
+Effective Weight (share units):
+
+W_user = H_user × L × B_boost
+W_pool = Σ W_user
+
+
+---
+
+3) Expected Daily Pool Reward (no guarantees)
+
+BTC_per_day_pool = (H_pool / H_net) × (B_day × R_block)
+
+Optional: add transaction fees share factor γ (0…1) if you want to include an estimate of fees:
+
+BTC_per_day_pool = (H_pool / H_net) × (B_day × (R_block + γ))
+
+User daily reward (before fees):
+
+BTC_user_gross = (W_user / W_pool) × BTC_per_day_pool
+
+After platform fee & referral:
+
+BTC_user_net = BTC_user_gross × (1 - fee) - referral_out
+
+(If referral is paid by platform treasury, then simply BTC_user_net = BTC_user_gross × (1 - fee) and pay ref_cut separately.)
+
+
+---
+
+4) Boosts (BTC stake without interest)
+
+BTC stake yahan yield-giving asset nahi, sirf boost trigger karta hai taake “interest” na banay:
+
+Example boost schedule:
+
+0 BTC → B_boost = 1.00
+
+≥ 0.5 BTC → B_boost = 1.05
+
+≥ 1.0 BTC → B_boost = 1.10
+
+≥ 2.0 BTC → B_boost = 1.20 (Values configurable.)
+
+
+
+
+---
+
+5) Locking (time commitment without fixed %)
+
+1 month: L = 1.00
+
+6 months: L = 1.10
+
+12 months: L = 1.20
+
+24 months: L = 1.30
+
+
+Early unlock = penalty on W_user or burn part of rewards (transparent, preset).
+
+
+---
+
+6) Example (numbers)
+
+Assume:
+
+R_block = 3.125, B_day = 144 → 450 BTC/day network issuance (base).
+
+H_net = 600 EH/s = 600 × 10^18 H/s.
+
+k = 0.1 TH/s per GBTC Hash (so 1 GBTC Hash = 0.1 × 10^12 H/s).
+
+Your pool total: users combined H_pool = 10 PH/s = 10 × 10^15 H/s.
+
+Then:
+
+Ratio = H_pool / H_net = (10×10^15) / (600×10^18) = (10/600) × 10^-3 ≈ 1.6667×10^-5
+
+BTC_per_day_pool = 450 × 1.6667×10^-5 ≈ 0.0075 BTC/day
+
+
+
+User A:
+
+GBTC Hash = 50,000 tokens → H_user = 50,000 × 0.1 TH/s = 5,000 TH/s = 5 PH/s
+
+BTC stake = 1.0 BTC → B_boost = 1.10
+
+Lock = 12 mo → L = 1.20
+
+
+Pool has two users only for simplicity:
+
+User A weight: W_A = 5 PH/s × 1.10 × 1.20 = 6.6 PH/s
+
+User B: the rest H_pool = 10 PH/s → suppose W_B = 3.4 PH/s
+
+Then W_pool = 10.0 PH/s (nice and tidy by design)
+
+
+Shares:
+
+User A share = 6.6 / 10 = 66%
+
+Daily gross reward for A = 0.0075 × 0.66 = 0.00495 BTC/day
+
+If fee = 5% → net ≈ 0.0047025 BTC/day
+
+Monthly (30d) ≈ ~0.1411 BTC (variable; not fixed, depends on H_net etc.)
+
+
+
+---
+
+7) Anti-Manipulation & Safety
+
+Snapshot model: Every N minutes (e.g., 10 min) snapshot W_pool & W_user → pro-rata credits accumulate across the day; prevents “in/out hopping”.
+
+TWAP of H_net: Use 24h time-weighted average network hashrate to smooth spikes.
+
+Cap multipliers: Max B_boost & L to avoid whales breaking distribution.
+
+Slashing only on early unlock: Never slash principal on normal unlocks.
+
+Transparent math: Show public dashboard with: H_net, R_block, B_day, H_pool, W_pool, pool reward, fees, and per-user share.
+
+
+
+---
+
+8) Data Model (minimal)
+
+users
+
+id, wallet, created_at
+
+
+stakes
+
+id, user_id, gbtc_hash_amount, btc_stake_amount, lock_start, lock_end, lock_multiplier, boost_multiplier, active
+
+
+snapshots
+
+id, ts, H_net, R_block, B_day, H_pool, W_pool, BTC_per_day_pool_estimate
+
+
+weights
+
+id, snapshot_id, user_id, W_user
+
+
+rewards
+
+id, user_id, from_ts, to_ts, gross_btc, fee_btc, net_btc, claimed (bool)
+
+
+referrals
+
+id, referrer_id, referee_id, ref_btc_paid, ts
+
+
+
+---
+
+9) Daily Payout Algorithm (server cron)
+
+1. Pull/compute H_net (TWAP), set R_block, B_day.
+
+
+2. Compute H_user for every active stake: gbtc_hash_amount × k.
+
+
+3. Compute W_user = H_user × L × B_boost; sum W_pool.
+
+
+4. BTC_per_day_pool = (Σ H_user / H_net) × (B_day × R_block) (or weight-based with fees).
+
+
+5. For each user:
+gross = (W_user / W_pool) × BTC_per_day_pool
+fee = gross × fee_rate
+net = gross − fee
+
+
+6. Record rewards, update balances; optionally stream intra-day using snapshots.
+
+
+
+
+---
+
+10) Frontend UX (clear & Halal-aligned)
+
+No % promise anywhere.
+
+Show: “Your Weight”, “Pool Weight”, “Yesterday’s Pool Reward”, “Your Share Yesterday”, 7-day trend.
+
+Lock selection shows multipliers, not ROI.
+
+BTC stake card says: “Staking BTC boosts weight only; no fixed interest.”
+
+
+
+---
+
+11) Config You Pick Before Launch
+
+k (hash per GBTC Hash).
+
+Lock tiers & multipliers L.
+
+BTC stake → B_boost schedule.
+
+fee and whether referral comes from fee or treasury.
+
+Early-unlock policy.
+
+
+
+---
+
+TL;DR
+
+Variable, performance-based rewards from a virtual hashrate model that mirrors BTC network economics.
+
+No fixed APR/APY → not interest; it’s a pro-rata share of simulated mining output.
+
+Fully transparent math, easy to implement, and scalable.

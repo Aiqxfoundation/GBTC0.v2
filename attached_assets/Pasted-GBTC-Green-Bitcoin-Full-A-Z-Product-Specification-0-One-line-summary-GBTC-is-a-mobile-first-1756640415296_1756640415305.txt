@@ -1,0 +1,577 @@
+GBTC (Green Bitcoin) — Full A → Z Product Specification
+
+0) One-line summary
+
+GBTC is a mobile-first, app-style mining platform where users deposit USDT to buy Hash Power (HP); blocks are mined every 10 minutes, and each block’s GBTC reward is distributed proportionally to active users’ HP. Mined GBTC tokens are transferable internally user→user. Referral commissions (USDT) are paid on power purchases (10% tier-1, 5% tier-2). When ~25% of supply is mined, GBTC becomes tradeable on exchanges and external withdrawals become available.
+
+
+---
+
+1. Primary rules & business model (the absolute musts)
+
+1. Deposit-first: Without depositing USDT and buying Power, a user has 0 HP and earns nothing.
+
+
+2. 1 USDT = 1 HP by default (admin-configurable). Users pick how much USDT to spend using a slider (1 → 100+). Slider deducts from available USDT balance and credits HP immediately (on purchase).
+
+
+3. Block time: 10 minutes → 144 blocks/day.
+
+
+4. Block reward: Configurable; start value example = 6.25 GBTC / block (admin-set). Blocks are distributed to active miners only proportionally to HP share.
+
+
+5. Claim requirement: Users must claim at least once per 24 hours (a single click or auto-check-in). If they do not claim within 24 hours they become inactive and their HP is temporarily ignored from distribution until they next actively claim; when they re-activate they start receiving rewards from the next block onward (they do NOT retroactively receive missed blocks).
+
+
+6. Mined token transfer rules: Mined GBTC tokens are transferable only internally (user → user). No external withdrawals of mined GBTC until the token is listed on exchanges (which happens after ~25% of total supply has been mined).
+
+
+7. Referral commissions: When a user purchases HP (spends USDT to buy power), immediately pay: Tier-1 (direct referrer) = 10% of USDT spent, Tier-2 (referrer’s referrer) = 5%. These commissions are paid in USDT and are withdrawable (admin-approved) or can be used to buy more HP.
+
+
+8. Withdrawal policy: USDT withdrawals are admin-approved — user creates a withdrawal request; admin checks & approves and system executes the payout. Withdraw fees: flat 1 USDT per withdrawal (configurable). Swap fee if you support internal swap (token→USDT) = 1 USDT (configurable).
+
+
+9. Tokenomics: Total supply = 21,000,000 GBTC. Emission controlled by block reward schedule and halving every 2 years (or other admin-configurable schedule). When ~25% (5,250,000 GBTC) is mined, exchange listing is targeted and external withdraws for mined tokens enabled.
+
+
+10. Admin centralization: Deposits submitted by users (TXID) are approved/rejected by admin. You opted to keep deposits admin-approval to avoid API costs & abuse. Auto-deposit detection can be added later.
+
+
+
+
+---
+
+2. High-level UX / Pages (app-style, mobile-first)
+
+All buttons open pages (app-like). Minimal page list — each is a full page (not just a panel).
+
+1. Landing / Home
+
+Project intro, tokenomics, CTA “Start Mining”.
+
+
+
+2. Sign Up / Login
+
+Google OAuth + Email option.
+
+After login go to Dashboard.
+
+
+
+3. Main Mining Dashboard (app heart)
+
+Top bar: USDT Balance | GBTC Mined Balance | My HP
+
+Big animated block visual with 10-min countdown
+
+Live: My HP, Global HP, Current Block Reward, My estimated reward for current block, Unclaimed GBTC
+
+CTA Buttons: Claim Rewards, Purchase Power, Transfer Tokens, Deposit USDT, Withdraw USDT
+
+
+
+4. Purchase Power
+
+Slider (1 → 100+) to spend USDT. Shows exact HP gained.
+
+“Confirm purchase” button.
+
+Info text: 1 USDT = 1 HP (default), no HP without deposit.
+
+
+
+5. Deposit (submit TXID)
+
+Show main deposit address (copy button).
+
+Form field to paste TXID + optional note. Warning in red: “Fake TXID will lead to account freeze/block”.
+
+Submissions go into Admin Pending queue.
+
+
+
+6. Withdraw
+
+User creates withdrawal request (amount, target address).
+
+Admin approves/rejects from admin console.
+
+
+
+7. Transfer (Token: user→user)
+
+Internal transfer form: recipient username, amount, memo.
+
+Immediate ledger entries and balance updates.
+
+
+
+8. Global Info
+
+Total USDT Deposits, Total Withdrawals, Active Miners, Registered Users, Global HP, Circulating Mined Supply, Next Block countdown
+
+FOMO ticker: progress to “25% mined” threshold.
+
+
+
+9. Referral Page
+
+My referral link, Tier1/Tier2 stats, commissions earned.
+
+
+
+10. Admin Panel
+
+Pending deposits (approve/reject/freeze user), pending withdrawals (approve/reject), edit settings (block reward, halving schedule, fees, min deposit), user search, freeze/unfreeze/ban user, manual HP adjustments, mining snapshots, global supply reconciliation.
+
+
+
+11. Support / FAQ / Terms — with clear rules about internal-only tokens pre-listing.
+
+
+
+
+---
+
+3. Data model (DB tables — minimal & essential)
+
+Use transactional DB (Postgres recommended). Ledger-first design (immutable entries) is mandatory.
+
+users
+id, username, email, password_hash, role (user/admin), status (active/frozen/banned), usdt_balance (DEC), hp_balance (DEC), token_balance (DEC), referrer_id, created_at, last_active_at
+
+deposit_requests
+id, user_id, txid, amount_usdt_declared, status (pending/approved/rejected), admin_id, created_at, approved_at
+
+withdrawal_requests
+id, user_id, amount_usdt, fee_usdt, status (pending/approved/executed/rejected), admin_id, created_at, executed_at, tx_hash
+
+power_purchases
+id, user_id, amount_usdt, hp_added, created_at
+
+ledger (immutable)
+id, user_id NULLABLE, type ENUM (deposit, purchase_power, referral_income, token_mine, token_transfer_out, token_transfer_in, withdraw_request, withdraw_paid, admin_adjust), asset (USDT/GBTC/HP), amount, balance_after, meta JSON, created_at
+
+token_transfers
+id, from_user NULLABLE (null for mint), to_user, amount_token, memo, created_at
+
+mining_snapshot / blocks
+block_id (sequential), timestamp, block_reward, total_hp_at_block, emitted_tokens, note (e.g. manual adjustments)
+
+referral_payouts
+id, referrer_id, referred_user_id, tier, amount_usdt, purchase_id, created_at
+
+global_supply (cache single-row)
+total_minted_token, last_updated
+
+processed_tx (for avoiding duplicate txids)
+txid, processed_at, source
+
+
+
+---
+
+4. Core server logic & mining flow (step-by-step)
+
+A) Purchase Power (client)
+
+1. User logs in. Must have usdt_balance > 0.
+
+
+2. User opens Purchase Power page and uses slider to choose X USDT. Slider UI shows HP = X × rate (default 1:1).
+
+
+3. On Confirm: backend creates power_purchases record; deducts user.usdt_balance, increases user.hp_balance, inserts ledger entries. Immediately increases GlobalHP.
+
+
+
+Referral payout: On each power purchase:
+
+Compute tier1 = 10% × amount_usdt, tier2 = 5% × amount_usdt (if uplines exist).
+
+Update referrer.usdt_balance += tier1, create ledger & referral_payouts entry.
+
+Update referrer_of_referrer.usdt_balance += tier2 similarly.
+
+
+B) Block mining (every 10 minutes)
+
+A scheduled job (cron/worker) runs at block times to create one block record:
+
+1. Read GlobalHP (sum of all user.hp_balance for active users).
+
+
+2. Determine block_reward according to schedule (halving logic).
+
+
+3. If GlobalHP == 0:
+
+No tokens distributed; tokens remain in reserve OR return to supply pool (not minted).
+
+
+
+4. Else:
+
+For each active user U:
+user_tokens = (U.hp_balance / GlobalHP) × block_reward
+Insert token_transfers (from system null → U) and ledger entry type token_mine.
+Update user.token_balance += user_tokens.
+Update global_supply.total_minted += sum(user_tokens).
+
+
+
+5. Insert blocks row with totals and snapshots.
+
+
+
+Important: If GlobalHP < required “full HP” threshold you want for full distribution, you can optionally scale distribution proportionally and return remainder to reserve. (We already use proportional distribution; reserve policy is optional.)
+
+C) Claiming
+
+The app requires user to claim at least once every 24 hours. Implement as:
+
+When a block is minted, tokens allocated to users are credited to user.token_balance but flagged unclaimed OR you maintain unclaimed queue per user.
+
+The user must press Claim to move unclaimed → claimable/confirmed. (Simpler: mark last_claim timestamp; if last_claim > 24h then mark user inactive so next blocks won’t include them.)
+
+
+Implementation options:
+
+Preferred: user must call Claim → server updates last_claim = now(); if a user’s last_claim is older than 24h at block time, treat them as inactive for that block.
+
+
+
+D) Inactivity handling
+
+If a user misses claim window:
+
+Set user.status = inactive_mining (or maintain flag).
+
+Their HP ignored in next block calculations until they claim again.
+
+No retroactive rewards.
+
+
+
+E) Transfers & Withdrawals
+
+Internal token transfers: immediate, ledger entries.
+
+USDT withdrawals: user creates request; admin reviews and approves; on approval system sends USDT from main wallet and marks withdrawal as executed.
+
+
+
+---
+
+5. Admin Panel — Exact action list (must-have)
+
+Admins must have full controls:
+
+Deposits
+
+View pending deposit TXIDs, verify on-chain manually, Approve (credits usdt_balance) / Reject (message) / Freeze user.
+
+Option: Auto-approve if TXID verified by node/provider (future upgrade).
+
+
+Withdrawals
+
+View withdrawal queue, verify KYC or fraud flags, Approve/Reject. Approve sends on-chain funds from central wallet (signed by admin-controlled key).
+
+
+Users
+
+Freeze/Unfreeze user, Ban user, Adjust balances (admin adjustment), view ledger, view referrals.
+
+
+Mining controls
+
+Set block reward, schedule halving, emergency pause mining, manual minting or burn (for emergencies).
+
+
+Config & settings
+
+Set min deposit (10 USDT), slider ranges, swap/withdraw fees, referral percentages, claim window (24h), etc.
+
+
+Audit
+
+View immutable ledger, mining snapshots, global supply reconciliation, processed tx logs.
+
+
+
+
+---
+
+6. APIs (essential endpoints)
+
+Use REST + WebSocket for real-time UI events (next block countdown, global HP)
+
+POST /auth/login — login/signup (Google/Email)
+
+GET /user/me — returns balances, hp, tokens, last_claim, referral
+
+POST /deposit/submit — submit TXID + amount
+
+GET /deposit/pending — admin
+
+POST /deposit/:id/approve — admin approves
+
+POST /purchase/power — body { amount_usdt } — does purchase + referral payouts
+
+GET /global/stats — total deposits, total withdrawals, globalHP, total_mined
+
+POST /transfer/token — internal token transfer
+
+POST /withdraw/request — user request
+
+GET /withdraw/pending — admin
+
+POST /withdraw/:id/approve — admin (executes payout)
+
+GET /leaderboard — top HP holders
+
+WS /events — push block events, new deposit, progress to 25%
+
+
+
+---
+
+7. Security & Anti-abuse (concrete)
+
+Min Deposit: 10 USDT required as activation.
+
+Captcha: reCAPTCHA/hCaptcha on signup & deposit submission.
+
+Phone verification (SMS) for withdrawals & high-value actions.
+
+Rate-limits: max X deposit submissions per IP/day.
+
+Device fingerprinting: to detect multiple accounts.
+
+TXID validation: when admin verifies a deposit, check on-chain TX: exact amount & destination address & confirmations. Repeated fake TXIDs => escalate to freeze/ban. Show warning message when user submits TXID.
+
+Referral abuse controls: temporary hold on commission if deposit appears suspicious or from same device/phone.
+
+Ledger immutability: no balances updated without corresponding ledger entries — use DB transactions for consistency.
+
+
+
+---
+
+8. Tokenomics detail & listing condition
+
+Total supply: 21,000,000 GBTC.
+
+Distribution example suggestion:
+
+Mining: 70% (14,700,000)
+
+Referral & rewards/reserve: 15% (3,150,000)
+
+Team / reserve: 10% (2,100,000)
+
+Marketing / liquidity: 5% (1,050,000)
+
+
+Halving rule: every 2 years reduce block reward by 50% — causes long-term scarcity. Admin can change timing but must show in UI.
+
+Listing trigger: when global_supply.total_minted >= 0.25 * total_supply (5,250,000 GBTC) admin begins exchange listing processes and enables external withdrawals of mined tokens. Until then, mined tokens are internal-only.
+
+Swap / Withdraw fees: default swap fee = 1 USDT; withdraw fee = 1 USDT (flat)—shown clearly in UI.
+
+
+
+---
+
+9. UI/UX specifics (important for Replit devs)
+
+Mobile-first PWA styling (bottom nav, big CTA).
+
+Slider for power purchase must be smooth and show real-time HP and new user proportion after purchase.
+
+Block visual: 3D cube animation updated every 10 minutes. Do not make it heavy — use CSS + lightweight WebGL or canvas fallback.
+
+Claim button: prominent, with clear “Last claimed X hrs ago” and yellow warning if > 18 hrs.
+
+FOMO ticker: progress bar to 25% mined and text: “When 25% mined, GBTC will list on exchanges → external withdrawals enabled”.
+
+Admin console: table rows for pending deposits with inline Approve/Reject/Freeze buttons. Each admin action generates an audit log entry.
+
+
+
+---
+
+10. Example mathematics (walkthroughs everyone will understand)
+
+Constants, example values:
+
+Block time = 10 min → 144 blocks/day
+
+Initial Block Reward = 6.25 GBTC/block (admin can set)
+
+Global HP example = 10,000 HP (sum of everyone)
+
+User A HP = 100 HP
+
+
+Per Block:
+
+User A reward per block = (100 / 10,000) × 6.25 = 0.0625 GBTC per block
+
+Per Day:
+
+Blocks/day = 144
+User A daily = 0.0625 × 144 = 9 GBTC/day
+
+Purchase example:
+
+User deposits 100 USDT → buys 100 HP (1:1)
+
+If global HP before purchase = 9,900 HP, after purchase = 10,000 HP
+
+User share = 100 / 10,000 = 1%
+
+If block reward = 6.25, per-block = 0.0625 GBTC → daily ≈ 9 GBTC
+
+
+Referral example:
+
+User B buys 200 USDT of power. User B’s Tier-1 referrer C receives 10% × 200 = 20 USDT immediately credited to C’s USDT balance. Tier-2 D receives 5% × 200 = 10 USDT.
+
+
+25% supply example:
+
+21,000,000 × 25% = 5,250,000 GBTC
+
+When global_supply.total_minted >= 5,250,000 admin will begin exchange listing and enable external token withdrawals.
+
+
+> Note: The absolute time to reach 25% depends on initial block reward and active HP growth. Don’t promise a timeline.
+
+
+
+
+---
+
+11. Edge-cases & recommended default settings
+
+Minimum purchase: 10 USDT to activate mining (prevents bots and dust accounts).
+
+Slider max: start at 100 USDT; allow “+” custom.
+
+Claim window: 24 hours; warning at 18 hours.
+
+Admin review delays: deposits require manual approval — inform users expected approval time (e.g., 0–24 hours).
+
+Unmatched TXIDs: keep flagged for manual review. Repeated invalid submissions → temporary freeze then ban.
+
+Double spend / reorgs: require N confirmations (set by admin) before approving. TRON = 1–2, BSC/ETH = more.
+
+System reserves: keep token reserve for exchange liquidity and fees; optionally burn % of transfer to create sink.
+
+
+
+---
+
+12. Implementation roadmap (recommended phases)
+
+Phase 0 — Prototype (Replit / single-file front-end)
+
+Provide single-file HTML+JS demo (already done) that simulates HP purchases, block rewards (simulated), slider purchase, claim button, transfer UI.
+
+
+Phase 1 — MVP Backend & Admin (Node/PHP + Postgres)
+
+Implement user auth (Google + Email), DB schema above, purchase power endpoint, mining worker, admin panel for deposit approval & withdrawals, ledger and token transfer endpoints. Manual TXID deposit workflow.
+
+
+Phase 2 — Production launch
+
+Integrate on-chain deposit detection (optional), secure hot wallet + cold wallet for USDT, websocket for real-time UI, load testing, security hardening, legal checks for jurisdictions.
+
+
+Phase 3 — Listing readiness
+
+Prepare audit, token contract (if planning on-chain token), ensure 25% mined logic, prepare exchange listing, enable external withdrawals.
+
+
+
+---
+
+13. Developer notes to send to Replit (copy/paste)
+
+(This short checklist is what you actually message Replit so they build a complete app, not just pages.)
+
+> Build a full-stack PWA named GBTC (Green Bitcoin) with the following features:
+
+Mobile-first UI with pages: Home, Signup/Login (Google + email), Dashboard (main mining), Purchase Power (slider), Deposit (TXID submit), Withdraw (request), Transfer (internal), Global Info, Referral, Admin Panel.
+
+Backend (Node.js/Express or PHP) with Postgres DB using the schema in the spec (ledger-first). Include mining worker that mints one block every 10 minutes and distributes block_reward proportionally to active users’ HP. Add halving schedule every 2 years.
+
+Implement Purchase Power endpoint: deduct USDT balance, credit HP, pay referral USDT commissions (10%/5%) immediately to upline balances.
+
+Deposits: user submits TXID to main wallet; deposits appear pending in admin; admin approves (credits USDT). Withdrawals: admin approves payments.
+
+Claim rule: user must claim within 24h (flag inactivity). If inactive, HP ignored until user claims again; resumed next block.
+
+Tokens (GBTC) remain internal-only and transferable user-to-user until global_minted >= 25% of supply (5,250,000). After that, enable external withdrawals/listing features.
+
+Implement immutable ledger and processed_tx table for audits. Provide admin tools: approve deposits/withdrawals, freeze accounts, manual adjustments, view mining snapshots, show global supply counter and real-time stats.
+
+UI must show precise formulas and live calculations for transparency. Provide websocket events for block countdown and progress.
+
+Default settings: min_deposit=10 USDT, slider purchase 1–100+, swap_fee=1 USDT (if implemented), withdraw_fee=1 USDT.
+
+Deliver both source code and a README that explains deployment, environment variables (DB, wallet keys), and admin credentials.
+
+
+
+
+(Attach the full spec doc above.)
+
+
+---
+
+14. Final checklist to give Replit (so they build a real app, not just pages)
+
+[ ] Full DB schema (tables above) implemented
+
+[ ] Auth (Google + email)
+
+[ ] Admin area (approve deposits, withdrawals, freeze/unfreeze users)
+
+[ ] Purchase power slider UI + backend endpoint
+
+[ ] Mining worker job that emits a block every 10 minutes
+
+[ ] Claim enforcement (24h)
+
+[ ] Referral payout engine (10%/5% on purchase)
+
+[ ] Internal token transfer UI + endpoint
+
+[ ] Global metrics & FOMO ticker to 25% mined
+
+[ ] Immutable ledger & processed_tx logs
+
+[ ] Warning messages & freeze policy for repeated fake TXIDs
+
+[ ] Documentation + deployment instructions
+
+
+
+---
+
+15. Short FAQ to include in app or with the brief
+
+Q: “Can I buy tokens directly?” — A: No. GBTC tokens are earned via mining only (mining powered by USDT purchases).
+
+Q: “Can I withdraw mined tokens now?” — A: Not until GBTC reaches ~25% mined and is listed on exchanges. Until then you can transfer tokens to other users inside the app.
+
+Q: “What if I submit a fake TXID?” — A: Your account will be rejected; repeated fake attempts will lead to temporary freeze or permanent ban.
+
+Q: “How are referrals paid?” — A: On power purchase only: 10% to direct referrer, 5% to second tier — immediately credited in USDT to uplines

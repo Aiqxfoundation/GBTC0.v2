@@ -1,0 +1,76 @@
+Token Supply Parameters
+
+Maximum Supply: 2,100,000 GBTC
+
+Block Time: 1 hour
+
+Blocks per Day: 24
+
+Blocks per Halving: 4,200 (~175 days)
+
+Halving Interval: Every 6 months
+
+
+
+---
+
+Block Rewards & Halving Schedule
+
+Initial Block Reward: 50 GBTC per block
+
+First Halving: After 4,200 blocks (~6 months) → reward = 25 GBTC
+
+Second Halving: After 8,400 blocks (~12 months) → reward = 12.5 GBTC
+
+Third Halving: After 12,600 blocks (~18 months) → reward = 6.25 GBTC
+
+Fourth Halving: After 16,800 blocks (~24 months) → reward = 3.125 GBTC
+
+And so on, until the maximum supply of 2.1 million GBTC is reached.
+
+
+
+---
+
+Supply Release Curve
+
+Year 1: ~315,000 GBTC released
+
+Year 2: ~393,750 GBTC cumulative supply
+
+Year 5: ~1 million GBTC in circulation
+
+Year 10+: Full 2.1 million supply mined
+
+
+
+---
+
+Launch Timeline (TGE)
+
+The Token Generation Event (TGE) will take place only when the GBTC ecosystem reaches 1 million verified participants. This ensures that the project begins with strong community adoption, global visibility, and network stability.
+
+Mining Phase: Users accumulate mining rewards before TGE.
+
+TGE (Token Generation Event): Official release of GBTC once network participants milestone is achieved 100K - 1Million.
+
+Withdrawals: After TGE, users can withdraw mined tokens directly to their wallets.
+
+
+
+---
+
+Utility & Multi-Chain Expansion
+
+GBTC is not just a mining token — it is built for multi-chain interoperability and real-world DeFi use cases:
+
+1. Wrapped Bitcoin (wBTC-style): GBTC can be wrapped and bridged to multiple chains (Ethereum, Solana, BSC, Polygon, etc.), enabling cross-chain liquidity.
+
+
+2. DeFi Integration: GBTC can be staked, farmed, or provided as liquidity on decentralized exchanges.
+
+
+3. Bridge Utility: Holders can seamlessly move GBTC between chains for maximum flexibility.
+
+
+4. BTC Relationship: GBTC mirrors Bitcoin’s scarcity model (but rarer, with only 2.1M supply). Over time, it can serve as a complementary asset alongside BTC, optimized for faster adoption in DeFi.

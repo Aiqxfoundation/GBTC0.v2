@@ -1,0 +1,80 @@
+GBTC Mining Project – FAQs
+
+Q1. What is GBTC?
+GBTC (Green Bitcoin) is a decentralized token inspired by Bitcoin’s scarcity model, with a total supply of 21 million tokens and a fair mining + hashrate-based distribution system.
+
+Q2. How can I start mining GBTC?
+First, sign up with Google. Then deposit USDT into the project’s main wallet, purchase hash power, and start mining. Without a deposit, your hash power = 0.
+
+Q3. What is hash power?
+Hash power represents your mining strength. The more USDT you spend to buy hash power, the more GBTC tokens you earn per block.
+
+Q4. How are tokens mined?
+
+Every 10 minutes = 1 block mined.
+
+Active miners share the block reward based on their purchased hash power.
+
+If you don’t claim daily, your account is marked inactive, and you don’t receive rewards until you return active.
+
+
+Q5. What happens if I fake a deposit transaction?
+Your account can be frozen or blocked permanently. Only real blockchain transactions are accepted.
+
+Q6. Can I withdraw mined tokens?
+No, mined tokens can only be transferred between existing users inside the system until 25% of total supply is mined. After that, GBTC becomes tradable on exchanges.
+
+Q7. What can I withdraw now?
+You can only withdraw USDT earned through referral commissions.
+
+Q8. How does the referral system work?
+When your referral purchases hash power:
+
+Level 1 (direct): You earn 10% USDT commission.
+
+Level 2 (indirect): You earn 5% USDT commission.
+
+
+Q9. What is “Purchase Power”?
+It’s where you choose how much USDT you want to spend (via a slider, e.g., 1–100 USDT or more). That USDT converts into hash power instantly.
+
+Q10. What is the supply model?
+
+Total supply = 21M GBTC.
+
+Blocks mined every 10 minutes.
+
+Supply gets harder as more miners join (reward per block decreases).
+
+At 25% mined, GBTC lists on exchanges. Mining continues long-term with decreasing rewards.
+
+
+Q11. Can I transfer tokens to anyone?
+Yes, but only within the system (user-to-user transfer) until listing.
+
+Q12. Why is the system fair?
+
+Rewards depend on real investment (hash power).
+
+Inactive users don’t get free tokens.
+
+Global supply calculator ensures transparent tokenomics.
+
+Admin cannot manipulate balances—only approve deposits/withdrawals.
+
+
+Q13. What does the Admin control?
+The Admin can:
+
+Approve/Reject deposits.
+
+Approve/Reject withdrawals.
+
+Freeze/Unfreeze accounts if rules are broken.
+
+
+Q14. What happens if I don’t claim my mined tokens daily?
+Your hash power becomes temporarily inactive, and you skip that block’s reward. You start earning again from the next block after reactivation.
+
+Q15. Why invest in GBTC?
+Because it’s designed as a fair mining project, with real scarcity like Bitcoin & Ethereum, long-term growth potential, and USDT-backed incentives for referrals and power purchase.
