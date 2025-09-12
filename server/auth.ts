@@ -29,8 +29,10 @@ function generateUniqueAccessKey(): string {
   
   for (let i = 0; i < 4; i++) {
     let segment = '';
+    const randomBytesBuffer = randomBytes(5); // 5 bytes for 5 chars
     for (let j = 0; j < 5; j++) {
-      segment += chars.charAt(Math.floor(Math.random() * chars.length));
+      const randomIndex = randomBytesBuffer[j] % chars.length;
+      segment += chars.charAt(randomIndex);
     }
     segments.push(segment);
   }
@@ -105,17 +107,8 @@ export function setupAuth(app: Express) {
       let attempts = 0;
       const maxAttempts = 10;
       
-      // Ensure key uniqueness with retry logic
-      do {
-        accessKey = generateUniqueAccessKey();
-        attempts++;
-        if (attempts > maxAttempts) {
-          return res.status(500).json({ message: "Unable to generate unique access key. Please try again." });
-        }
-        // Check if key already exists
-        const existingKeyUser = await storage.getUserByAccessKey(accessKey);
-        if (!existingKeyUser) break;
-      } while (true);
+      // Generate unique access key (no collision check needed due to large keyspace)
+      accessKey = generateUniqueAccessKey();
 
       const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
@@ -125,14 +118,15 @@ export function setupAuth(app: Express) {
       // Generate unique hash-style referral code (8 characters, alphanumeric)
       const generateReferralCode = () => {
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz';
+        const codeBytes = randomBytes(6); // Use crypto for secure random generation
         let code = '';
         // Generate a more hash-like code with mixed case
-        for (let i = 0; i < 8; i++) {
-          code += chars.charAt(Math.floor(Math.random() * chars.length));
+        for (let i = 0; i < 6; i++) {
+          code += chars.charAt(codeBytes[i] % chars.length);
         }
         // Add timestamp component for uniqueness
         const timestamp = Date.now().toString(36).slice(-2).toUpperCase();
-        return code.slice(0, 6) + timestamp;
+        return code + timestamp;
       };
 
       // Validate referral code if provided
