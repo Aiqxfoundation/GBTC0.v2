@@ -37,6 +37,7 @@ export interface IStorage {
   // User methods
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByAccessKey(accessKey: string): Promise<User | undefined>;
   getUsersByReferralCode(referralCode: string): Promise<User[]>;
   findUserByOwnReferralCode(referralCode: string): Promise<User | null>;
   createUser(user: InsertUser): Promise<User>;
@@ -152,6 +153,11 @@ export class DatabaseStorage implements IStorage {
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+
+  async getUserByAccessKey(accessKey: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.accessKey, accessKey));
     return user || undefined;
   }
 

@@ -7,7 +7,7 @@ import { z } from "zod";
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   username: text("username").notNull().unique(),
-  publicKey: text("public_key").notNull().unique(),
+  accessKey: text("access_key").notNull().unique(),
   referralCode: text("referral_code").unique(),
   referredBy: text("referred_by"), // Referral code of the user who referred them
   usdtBalance: decimal("usdt_balance", { precision: 10, scale: 2 }).default("0.00"),
@@ -254,7 +254,7 @@ export const insertUserSchema = createInsertSchema(users).omit({
   isBanned: true,
   hasStartedMining: true,
 }).extend({
-  publicKey: z.string().min(64).max(64), // Ed25519 public key is 32 bytes = 64 hex chars
+  accessKey: z.string().regex(/^GBTC-[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}$/, "Access key must be in format GBTC-XXXXX-XXXXX-XXXXX-XXXXX"),
 });
 
 export const insertDepositSchema = createInsertSchema(deposits).omit({

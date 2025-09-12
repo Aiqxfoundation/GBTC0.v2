@@ -175,6 +175,16 @@ export class MemoryStorage implements IStorage {
     return this.users.get(userId);
   }
 
+  async getUserByAccessKey(accessKey: string): Promise<User | undefined> {
+    // For memory storage, find user by hashed access key
+    for (const user of this.users.values()) {
+      if ((user as any).accessKey === accessKey) {
+        return user;
+      }
+    }
+    return undefined;
+  }
+
   async getUsersByReferralCode(referralCode: string): Promise<User[]> {
     const referredUsers: User[] = [];
     for (const user of Array.from(this.users.values())) {

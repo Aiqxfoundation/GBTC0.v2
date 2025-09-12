@@ -1,7 +1,9 @@
 import { type Express } from "express";
 import session from "express-session";
-import { randomBytes } from "crypto";
-import * as ed25519 from "@noble/ed25519";
+import { randomBytes, scrypt } from "crypto";
+import { promisify } from "util";
+
+const asyncScrypt = promisify(scrypt);
 import { storage } from "./storage";
 import { User as SelectUser } from "@shared/schema";
 
@@ -20,33 +22,43 @@ declare module 'express-session' {
   }
 }
 
-// In-memory store for login challenges (nonces)
-// In production, this could be Redis or similar
-const challengeStore = new Map<string, { nonce: string; expiresAt: number }>();
-
-// Clean up expired challenges every minute
-setInterval(() => {
-  const now = Date.now();
-  Array.from(challengeStore.entries()).forEach(([username, challenge]) => {
-    if (challenge.expiresAt < now) {
-      challengeStore.delete(username);
+// Generate unique access key in format GBTC-XXXXX-XXXXX-XXXXX-XXXXX
+function generateUniqueAccessKey(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const segments = [];
+  
+  for (let i = 0; i < 4; i++) {
+    let segment = '';
+    for (let j = 0; j < 5; j++) {
+      segment += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-  });
-}, 60000);
+    segments.push(segment);
+  }
+  
+  return `GBTC-${segments.join('-')}`;
+}
 
-// Helper function to verify Ed25519 signature
-async function verifySignature(publicKeyHex: string, message: string, signatureHex: string): Promise<boolean> {
+// Hash access key for secure storage
+async function hashAccessKey(accessKey: string): Promise<string> {
+  const salt = randomBytes(16);
+  const hash = await asyncScrypt(accessKey, salt, 32) as Buffer;
+  return `${salt.toString('hex')}:${hash.toString('hex')}`;
+}
+
+// Verify access key against stored hash
+async function verifyAccessKey(accessKey: string, hashedKey: string): Promise<boolean> {
   try {
-    const publicKey = new Uint8Array(Buffer.from(publicKeyHex, 'hex'));
-    const signature = new Uint8Array(Buffer.from(signatureHex, 'hex'));
-    const messageBytes = new Uint8Array(Buffer.from(message, 'utf-8'));
+    const [saltHex, hashHex] = hashedKey.split(':');
+    if (!saltHex || !hashHex) return false;
     
-    return await ed25519.verify(signature, messageBytes, publicKey);
-  } catch (error) {
-    console.error('Signature verification error:', error);
+    const salt = Buffer.from(saltHex, 'hex');
+    const hash = await asyncScrypt(accessKey, salt, 32) as Buffer;
+    return hash.toString('hex') === hashHex;
+  } catch {
     return false;
   }
 }
+
 
 export function setupAuth(app: Express) {
   const sessionSettings: session.SessionOptions = {
@@ -79,19 +91,31 @@ export function setupAuth(app: Express) {
     }
   });
 
-  // Registration endpoint - takes username and publicKey
+  // Registration endpoint - generates unique access key
   app.post("/api/register", async (req, res, next) => {
     try {
-      const { username, publicKey, referredBy } = req.body;
+      const { username, referredBy } = req.body;
       
-      if (!username || !publicKey) {
-        return res.status(400).json({ message: "Username and public key are required" });
+      if (!username) {
+        return res.status(400).json({ message: "Username is required" });
       }
 
-      // Validate public key format (64 hex characters for Ed25519)
-      if (!/^[a-fA-F0-9]{64}$/.test(publicKey)) {
-        return res.status(400).json({ message: "Invalid public key format" });
-      }
+      // Generate unique access key
+      let accessKey: string;
+      let attempts = 0;
+      const maxAttempts = 10;
+      
+      // Ensure key uniqueness with retry logic
+      do {
+        accessKey = generateUniqueAccessKey();
+        attempts++;
+        if (attempts > maxAttempts) {
+          return res.status(500).json({ message: "Unable to generate unique access key. Please try again." });
+        }
+        // Check if key already exists
+        const existingKeyUser = await storage.getUserByAccessKey(accessKey);
+        if (!existingKeyUser) break;
+      } while (true);
 
       const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
@@ -121,9 +145,12 @@ export function setupAuth(app: Express) {
         // If referral code doesn't exist, we just ignore it (don't throw error)
       }
 
+      // Hash the access key for secure storage
+      const hashedAccessKey = await hashAccessKey(accessKey);
+      
       const user = await storage.createUser({
         username,
-        publicKey,
+        accessKey: hashedAccessKey,
         referralCode: generateReferralCode(),
         referredBy: validatedReferredBy,
         // Note: hashPower and baseHashPower will be set by database defaults
@@ -141,14 +168,15 @@ export function setupAuth(app: Express) {
       req.session.userId = user.id;
       req.user = user;
       
-      res.status(201).json(user);
+      // Return user data with the plain access key (only time it's shown)
+      res.status(201).json({ ...user, accessKey });
     } catch (error: any) {
       if (error?.message?.includes('endpoint has been disabled') || error?.code === 'XX000') {
         return res.status(503).json({ message: "Database is reactivating. Please try again in a moment." });
       }
       if (error.message?.includes('duplicate key value violates unique constraint')) {
-        if (error.message.includes('public_key')) {
-          return res.status(400).json({ message: "This public key is already registered" });
+        if (error.message.includes('access_key')) {
+          return res.status(400).json({ message: "This access key is already registered" });
         }
         return res.status(400).json({ message: "Username already exists" });
       }
@@ -156,76 +184,29 @@ export function setupAuth(app: Express) {
     }
   });
 
-  // Challenge endpoint - generates a nonce for login
-  app.post("/api/login/challenge", async (req, res) => {
+  // Simple login endpoint - uses username and access key
+  app.post("/api/login", async (req, res) => {
     try {
-      const { username } = req.body;
+      const { username, accessKey } = req.body;
       
-      if (!username) {
-        return res.status(400).json({ message: "Username is required" });
+      if (!username || !accessKey) {
+        return res.status(400).json({ message: "Username and access key are required" });
       }
 
-      // SECURITY FIX: Always generate nonce regardless of user existence to prevent username enumeration
-      const nonce = randomBytes(32).toString('hex');
-      const expiresAt = Date.now() + 60000; // 1 minute expiry
-
-      // Check if user exists, but don't reveal this in the response
-      const user = await storage.getUserByUsername(username);
-      
-      // Only store challenge if user actually exists (but always return success)
-      if (user) {
-        challengeStore.set(username, { nonce, expiresAt });
-      }
-
-      // Always return the same response regardless of user existence
-      res.json({ nonce });
-    } catch (error: any) {
-      if (error?.message?.includes('endpoint has been disabled') || error?.code === 'XX000') {
-        return res.status(503).json({ message: "Database is reactivating. Please try again in a moment." });
-      }
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
-  // Verify endpoint - verifies the signed challenge
-  app.post("/api/login/verify", async (req, res) => {
-    try {
-      const { username, signature, nonce } = req.body;
-      
-      if (!username || !signature || !nonce) {
-        return res.status(400).json({ message: "Username, signature, and nonce are required" });
-      }
-
-      // SECURITY FIX: Always return same error message to prevent username enumeration
+      // SECURITY: Always return same error message to prevent username enumeration
       const GENERIC_ERROR = "Invalid credentials";
 
-      // Check if challenge exists and is valid
-      const challenge = challengeStore.get(username);
-      let isValidChallenge = false;
-      
-      if (challenge && challenge.nonce === nonce && challenge.expiresAt >= Date.now()) {
-        isValidChallenge = true;
-        // Delete challenge immediately to prevent replay attacks
-        challengeStore.delete(username);
-      } else if (challenge) {
-        // Delete invalid/expired challenge
-        challengeStore.delete(username);
-      }
-
-      // Always get user and perform operations to maintain consistent timing
+      // Get user and perform operations to maintain consistent timing
       const user = await storage.getUserByUsername(username);
       
-      // Construct the message that would have been signed
-      const message = `GBTC:Login:${username}:${nonce}`;
-      
-      // SECURITY FIX: Always perform signature verification to prevent timing attacks
-      // Use dummy public key if user doesn't exist to maintain consistent timing
-      const publicKeyToUse = user?.publicKey || '0'.repeat(64); // Dummy key for non-existent users
-      const isValidSignature = await verifySignature(publicKeyToUse, message, signature);
+      // SECURITY: Always perform access key verification to prevent timing attacks
+      // Use dummy hash if user doesn't exist to maintain consistent timing
+      const hashedKeyToUse = user?.accessKey || 'dummy:hash';
+      const isValidAccessKey = await verifyAccessKey(accessKey, hashedKeyToUse);
 
-      // All conditions must be true for successful login
-      if (isValidChallenge && user && isValidSignature) {
-        // SECURITY FIX: Regenerate session to prevent session fixation
+      // Both conditions must be true for successful login
+      if (user && isValidAccessKey) {
+        // SECURITY: Regenerate session to prevent session fixation
         await new Promise<void>((resolve, reject) => {
           req.session.regenerate((err) => {
             if (err) reject(err);
