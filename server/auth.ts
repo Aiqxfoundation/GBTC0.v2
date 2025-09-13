@@ -67,7 +67,7 @@ export function setupAuth(app: Express) {
     secret: process.env.SESSION_SECRET || 'gbtc-mining-secret-key-2024',
     resave: false,
     saveUninitialized: false,
-    store: storage.sessionStore,
+    // Use in-memory session store to avoid PostgreSQL session table issues
     cookie: {
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       httpOnly: true,
