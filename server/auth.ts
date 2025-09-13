@@ -139,6 +139,16 @@ export function setupAuth(app: Express) {
         // If referral code doesn't exist, we just ignore it (don't throw error)
       }
 
+      // Get client IP address
+      const getClientIp = (req: any) => {
+        return req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+               req.headers['x-real-ip'] ||
+               req.connection?.remoteAddress ||
+               req.socket?.remoteAddress ||
+               req.ip ||
+               'unknown';
+      };
+
       // Hash the access key for secure storage
       const hashedAccessKey = await hashAccessKey(accessKey);
       
@@ -147,6 +157,7 @@ export function setupAuth(app: Express) {
         accessKey: hashedAccessKey,
         referralCode: generateReferralCode(),
         referredBy: validatedReferredBy,
+        registrationIp: getClientIp(req),
         // Note: hashPower and baseHashPower will be set by database defaults
       });
 

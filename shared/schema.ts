@@ -10,6 +10,7 @@ export const users = pgTable("users", {
   accessKey: text("access_key").notNull().unique(),
   referralCode: text("referral_code").unique(),
   referredBy: text("referred_by"), // Referral code of the user who referred them
+  registrationIp: text("registration_ip"), // IP address that created this account
   usdtBalance: decimal("usdt_balance", { precision: 10, scale: 2 }).default("0.00"),
   btcBalance: decimal("btc_balance", { precision: 18, scale: 8 }).default("0.00000000"), // BTC balance
   hashPower: decimal("hash_power", { precision: 10, scale: 2 }).default("0.00"),
@@ -240,6 +241,7 @@ export const btcStakingRewardsRelations = relations(btcStakingRewards, ({ one })
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
+  registrationIp: true,
   usdtBalance: true,
   btcBalance: true,
   hashPower: true,
