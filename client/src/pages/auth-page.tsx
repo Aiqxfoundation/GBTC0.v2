@@ -93,9 +93,6 @@ Access Key: ${generatedAccessKey}
 - Store both safely - we cannot recover them if lost
 - Keep this file secure and do not share with anyone
 
-=======================================
-         For support, contact us at:
-         support@gbtc-mining.com
 =======================================`;
 
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
