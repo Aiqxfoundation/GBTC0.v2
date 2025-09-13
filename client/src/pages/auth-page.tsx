@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth, isValidAccessKey, formatAccessKey } from "@/hooks/use-auth";
 import { Redirect, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +28,26 @@ export default function AuthPage() {
     saved: false,
     lastSixChars: ""
   });
+  const [hasIpRegistered, setHasIpRegistered] = useState<boolean | null>(null);
+
+  // Check if this IP has already registered an account
+  useEffect(() => {
+    const checkIpRegistration = async () => {
+      try {
+        const response = await fetch('/api/check-ip-registration');
+        if (response.ok) {
+          const data = await response.json();
+          setHasIpRegistered(data.hasRegistered);
+        }
+      } catch (error) {
+        console.error('Error checking IP registration status:', error);
+        // If error, allow registration to be safe
+        setHasIpRegistered(false);
+      }
+    };
+
+    checkIpRegistration();
+  }, []);
 
   // Redirect if already logged in
   if (user) {
@@ -235,19 +255,33 @@ Access Key: ${generatedAccessKey}
                   </Button>
                 </form>
                 
-                {/* Create Account Button */}
-                <div className="mt-6 pt-4 border-t border-gray-800">
-                  <p className="text-center text-gray-400 text-sm mb-3">Don't have an account?</p>
-                  <Button
-                    type="button"
-                    onClick={() => setShowRegister(true)}
-                    className="w-full bg-transparent border-2 border-[#f7931a] text-[#f7931a] hover:bg-[#f7931a] hover:text-black font-bold"
-                    data-testid="button-show-register"
-                  >
-                    <Shield className="w-4 h-4 mr-2" />
-                    Create New Account
-                  </Button>
-                </div>
+                {/* Create Account Button - Only show if IP hasn't registered before */}
+                {hasIpRegistered === false && (
+                  <div className="mt-6 pt-4 border-t border-gray-800">
+                    <p className="text-center text-gray-400 text-sm mb-3">Don't have an account?</p>
+                    <Button
+                      type="button"
+                      onClick={() => setShowRegister(true)}
+                      className="w-full bg-transparent border-2 border-[#f7931a] text-[#f7931a] hover:bg-[#f7931a] hover:text-black font-bold"
+                      data-testid="button-show-register"
+                    >
+                      <Shield className="w-4 h-4 mr-2" />
+                      Create New Account
+                    </Button>
+                  </div>
+                )}
+                
+                {/* Message for IPs that have already registered */}
+                {hasIpRegistered === true && (
+                  <div className="mt-6 pt-4 border-t border-gray-800">
+                    <Alert className="border-[#f7931a]/40 bg-[#f7931a]/10">
+                      <AlertTriangle className="h-4 w-4 text-[#f7931a]" />
+                      <AlertDescription className="text-sm text-[#f7931a]/90">
+                        An account has already been created from this device. Please use your existing credentials to login.
+                      </AlertDescription>
+                    </Alert>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ) : (
