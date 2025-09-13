@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Copy, Download, Eye, EyeOff, Shield, AlertTriangle, Key, ArrowRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { getDeviceFingerprint } from "@/lib/fingerprint";
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
@@ -67,9 +68,18 @@ export default function AuthPage() {
     }
     
     try {
+      // Collect device fingerprint data
+      toast({
+        title: "Verifying device...",
+        description: "Collecting device information for security",
+      });
+      
+      const deviceData = await getDeviceFingerprint();
+      
       const result = await registerMutation.mutateAsync({
         username: registerForm.username.trim(),
         referredBy: registerForm.referredBy.trim() || undefined,
+        deviceData,
       });
       
       // Registration successful - show the access key

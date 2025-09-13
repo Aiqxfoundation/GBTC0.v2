@@ -103,10 +103,50 @@ export function setupAuth(app: Express) {
   // Registration endpoint - generates unique access key
   app.post("/api/register", async (req, res, next) => {
     try {
-      const { username, referredBy } = req.body;
+      const { username, referredBy, deviceData } = req.body;
       
       if (!username) {
         return res.status(400).json({ message: "Please enter a valid username to create your account." });
+      }
+
+      // Check device fingerprint first (before creating user)
+      if (!deviceData || !deviceData.serverDeviceId || !deviceData.fingerprints) {
+        return res.status(400).json({ 
+          message: "Device verification is required for registration. Please refresh the page and try again." 
+        });
+      }
+
+      // Get client IP for device tracking
+      const getClientIp = (req: any) => {
+        return req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+               req.headers['x-real-ip'] ||
+               req.connection?.remoteAddress ||
+               req.socket?.remoteAddress ||
+               req.ip ||
+               'unknown';
+      };
+
+      // Check if device can register
+      const deviceResult = await storage.upsertDevice({
+        serverDeviceId: deviceData.serverDeviceId,
+        lastIp: getClientIp(req),
+        fingerprints: deviceData.fingerprints
+      });
+
+      if (!deviceResult.canRegister) {
+        if (deviceResult.device.blocked) {
+          return res.status(403).json({ 
+            message: "This device has been restricted from creating new accounts due to suspicious activity." 
+          });
+        } else if (deviceResult.device.registrations > 0) {
+          return res.status(403).json({ 
+            message: "An account has already been created from this device. Each device can only be used to register one account." 
+          });
+        } else {
+          return res.status(403).json({ 
+            message: "This device is not eligible for registration at this time." 
+          });
+        }
       }
 
       // Generate unique access key
@@ -179,6 +219,9 @@ export function setupAuth(app: Express) {
       // Set session
       req.session.userId = user.id;
       req.user = user;
+      
+      // Link device to user after successful registration
+      await storage.linkUserToDevice(user.id, deviceResult.device.id);
       
       // Return user data with the plain access key (only time it's shown)
       res.status(201).json({ ...user, accessKey });
