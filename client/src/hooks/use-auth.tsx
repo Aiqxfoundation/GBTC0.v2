@@ -101,10 +101,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
     onError: (error: Error) => {
+      // Professional Bitcoin-themed registration error toast
+      const cleanMessage = error.message.includes("already exists") 
+        ? "This username is already taken. Please choose a different username." 
+        : "Registration failed. Please check your information and try again.";
+        
       toast({
-        title: "Registration failed",
-        description: error.message,
+        title: "⚠️ Registration Failed",
+        description: cleanMessage,
         variant: "destructive",
+        className: "border-[#f7931a] bg-gray-900 text-white",
+        style: {
+          border: "2px solid #f7931a",
+          background: "linear-gradient(135deg, #1a1a1a 0%, #2d1810 100%)",
+          boxShadow: "0 0 20px rgba(247, 147, 26, 0.3)",
+        }
       });
     },
   });
