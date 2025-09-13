@@ -77,11 +77,8 @@ export default function AuthPage() {
       setShowKeyModal(true);
       setKeyConfirmation({ saved: false, lastSixChars: "" });
     } catch (error: any) {
-      toast({
-        title: "Registration failed",
-        description: error.message || "Failed to create account",
-        variant: "destructive",
-      });
+      // Error handling is done by the mutation's onError handler in use-auth.tsx
+      // This provides professional, consistent error messaging
     }
   };
 

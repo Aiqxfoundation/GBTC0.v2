@@ -99,7 +99,7 @@ export function setupAuth(app: Express) {
       const { username, referredBy } = req.body;
       
       if (!username) {
-        return res.status(400).json({ message: "Username is required" });
+        return res.status(400).json({ message: "Please enter a valid username to create your account." });
       }
 
       // Generate unique access key
@@ -112,7 +112,7 @@ export function setupAuth(app: Express) {
 
       const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
-        return res.status(400).json({ message: "Username already exists" });
+        return res.status(400).json({ message: "This username is already taken. Please choose a different username." });
       }
 
       // Generate unique hash-style referral code (8 characters, alphanumeric)
@@ -177,13 +177,13 @@ export function setupAuth(app: Express) {
       res.status(201).json({ ...user, accessKey });
     } catch (error: any) {
       if (error?.message?.includes('endpoint has been disabled') || error?.code === 'XX000') {
-        return res.status(503).json({ message: "Database is reactivating. Please try again in a moment." });
+        return res.status(503).json({ message: "Our system is currently updating. Please try creating your account again in a few moments." });
       }
       if (error.message?.includes('duplicate key value violates unique constraint')) {
         if (error.message.includes('access_key')) {
-          return res.status(400).json({ message: "This access key is already registered" });
+          return res.status(400).json({ message: "A technical error occurred during registration. Please try again with a different username." });
         }
-        return res.status(400).json({ message: "Username already exists" });
+        return res.status(400).json({ message: "This username is already taken. Please choose a different username." });
       }
       next(error);
     }

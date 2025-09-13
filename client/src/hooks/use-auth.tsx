@@ -101,14 +101,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
     onError: (error: Error) => {
-      // Professional Bitcoin-themed registration error toast
-      const cleanMessage = error.message.includes("already exists") 
-        ? "This username is already taken. Please choose a different username." 
-        : "Registration failed. Please check your information and try again.";
+      // Professional error handling with user-friendly messages
+      let professionalMessage = "We couldn't create your account. Please try again.";
+      
+      if (error.message.includes("already taken") || error.message.includes("already exists")) {
+        professionalMessage = "This username is already taken. Please choose a different username.";
+      } else if (error.message.includes("username") && error.message.includes("required")) {
+        professionalMessage = "Please enter a username to create your account.";
+      } else if (error.message.includes("updating") || error.message.includes("reactivating")) {
+        professionalMessage = "Our system is currently updating. Please try again in a few moments.";
+      } else if (error.message.includes("technical error")) {
+        professionalMessage = "A technical issue occurred. Please try again with a different username.";
+      }
         
       toast({
-        title: "⚠️ Registration Failed",
-        description: cleanMessage,
+        title: "Account Creation Failed",
+        description: professionalMessage,
         variant: "destructive",
         className: "border-[#f7931a] bg-gray-900 text-white",
         style: {
