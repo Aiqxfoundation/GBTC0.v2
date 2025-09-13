@@ -77,27 +77,8 @@ export default function AuthPage() {
   const downloadAccessKey = () => {
     if (!generatedAccessKey) return;
     
-    const content = `GBTC Mining Platform - Access Key
-⚠️  CRITICAL SECURITY WARNING ⚠️
-
-This is your ACCESS KEY for GBTC Mining Platform account: ${registerForm.username}
-
-Access Key: ${generatedAccessKey}
-
-🔒 SECURITY INSTRUCTIONS:
-• Keep this key absolutely secret - NEVER share it with anyone
-• Store it in a secure location (password manager, encrypted file, or offline)
-• This key is your ONLY way to access your account
-• There is NO password recovery option
-• If you lose this key, you will permanently lose access to your account and funds
-
-Account Details:
-• Username: ${registerForm.username}
-• Access Key: ${generatedAccessKey}
-• Generated: ${new Date().toISOString()}
-
-⚠️  If you suspect this key has been compromised, contact support immediately.
-`;
+    const content = `${registerForm.username}
+${generatedAccessKey}`;
 
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -336,9 +317,9 @@ Account Details:
 
       {/* Access Key Display Modal */}
       <Dialog open={showKeyModal} onOpenChange={() => {}}>
-        <DialogContent className="max-w-2xl bg-gray-950 border-red-500/20" data-testid="modal-access-key">
+        <DialogContent className="max-w-2xl bg-gray-950 border-2 border-[#f7931a]" data-testid="modal-access-key">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-400">
+            <DialogTitle className="flex items-center gap-2 text-[#f7931a]">
               <AlertTriangle className="w-5 h-5" />
               Your Access Key - SAVE THIS NOW!
             </DialogTitle>
@@ -346,10 +327,10 @@ Account Details:
           
           <div className="space-y-6">
             {/* Critical Warning */}
-            <Alert className="border-red-500 bg-red-950/50">
-              <AlertTriangle className="h-4 w-4 text-red-500" />
-              <AlertDescription className="text-red-200">
-                <strong>THIS IS YOUR ONLY CHANCE TO SEE YOUR ACCESS KEY!</strong>
+            <Alert className="border-2 border-[#f7931a] bg-[#f7931a]/10">
+              <AlertTriangle className="h-4 w-4 text-[#f7931a]" />
+              <AlertDescription className="text-[#f7931a]">
+                <strong>CRITICAL: SAVE YOUR ACCESS KEY NOW!</strong>
                 <br />
                 Once you close this window, we cannot recover it for you.
               </AlertDescription>
@@ -385,7 +366,7 @@ Account Details:
             {/* Download Option */}
             <Button
               onClick={downloadAccessKey}
-              className="w-full bg-blue-600 hover:bg-blue-700"
+              className="w-full bg-[#f7931a]/20 hover:bg-[#f7931a]/30 border-2 border-[#f7931a] text-[#f7931a]"
               data-testid="button-download-key"
             >
               <Download className="w-4 h-4 mr-2" />
@@ -393,13 +374,13 @@ Account Details:
             </Button>
 
             {/* Simplified Instructions */}
-            <div className="border-t border-gray-700 pt-4">
-              <Alert className="border-yellow-500/20 bg-yellow-950/30">
-                <Key className="h-4 w-4 text-yellow-500" />
-                <AlertDescription className="text-yellow-200">
-                  <strong>📋 Copy your access key now!</strong>
+            <div className="border-t border-[#f7931a] pt-4">
+              <Alert className="border-2 border-[#f7931a] bg-[#f7931a]/10">
+                <Key className="h-4 w-4 text-[#f7931a]" />
+                <AlertDescription className="text-[#f7931a]">
+                  <strong>Store Your Access Key Safely!</strong>
                   <br />
-                  You'll need it to login. Store it somewhere safe - we cannot recover it.
+                  You'll need it to login. Keep it secure - we cannot recover it.
                 </AlertDescription>
               </Alert>
             </div>
@@ -408,11 +389,11 @@ Account Details:
             <div className="space-y-3">
               <Button
                 onClick={() => copyToClipboard(generatedAccessKey || "", "Access key copied!")}
-                className="w-full bg-green-600 hover:bg-green-700 text-white font-bold"
+                className="w-full bg-[#f7931a]/20 hover:bg-[#f7931a]/30 border-2 border-[#f7931a] text-[#f7931a] font-bold"
                 data-testid="button-copy-key"
               >
                 <Copy className="w-4 h-4 mr-2" />
-                📋 COPY ACCESS KEY
+                COPY ACCESS KEY
               </Button>
               
               <Button
