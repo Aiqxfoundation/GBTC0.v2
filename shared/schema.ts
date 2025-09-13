@@ -155,6 +155,40 @@ export const btcPriceHistory = pgTable("btc_price_history", {
   timestamp: timestamp("timestamp").defaultNow(),
 });
 
+// Device Fingerprinting Tables
+export const devices = pgTable("devices", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  serverDeviceId: text("server_device_id").notNull().unique(),
+  firstSeen: timestamp("first_seen").defaultNow(),
+  lastSeen: timestamp("last_seen").defaultNow(),
+  lastIp: text("last_ip"),
+  asn: text("asn"),
+  registrations: integer("registrations").default(0),
+  riskScore: integer("risk_score").default(0),
+  blocked: boolean("blocked").default(false),
+  signalsVersion: text("signals_version").default("1.0"),
+});
+
+export const deviceFingerprints = pgTable("device_fingerprints", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  deviceId: uuid("device_id").references(() => devices.id).notNull(),
+  stableHash: text("stable_hash").notNull(),
+  volatileHash: text("volatile_hash").notNull(),
+  chUaHash: text("ch_ua_hash"),
+  webglHash: text("webgl_hash"),
+  canvasHash: text("canvas_hash"),
+  fontsHash: text("fonts_hash"),
+  storageFlags: text("storage_flags"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const userDevices = pgTable("user_devices", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").references(() => users.id).notNull(),
+  deviceId: uuid("device_id").references(() => devices.id).notNull(),
+  firstLinked: timestamp("first_linked").defaultNow(),
+});
+
 export const usersRelations = relations(users, ({ many, one }) => ({
   deposits: many(deposits),
   withdrawals: many(withdrawals),
@@ -169,6 +203,7 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   miningStats: one(userMiningStats),
   btcStakes: many(btcStakes),
   btcStakingRewards: many(btcStakingRewards),
+  userDevices: many(userDevices),
 }));
 
 export const depositsRelations = relations(deposits, ({ one }) => ({
@@ -235,6 +270,29 @@ export const btcStakingRewardsRelations = relations(btcStakingRewards, ({ one })
   stake: one(btcStakes, {
     fields: [btcStakingRewards.stakeId],
     references: [btcStakes.id],
+  }),
+}));
+
+export const devicesRelations = relations(devices, ({ many }) => ({
+  fingerprints: many(deviceFingerprints),
+  userDevices: many(userDevices),
+}));
+
+export const deviceFingerprintsRelations = relations(deviceFingerprints, ({ one }) => ({
+  device: one(devices, {
+    fields: [deviceFingerprints.deviceId],
+    references: [devices.id],
+  }),
+}));
+
+export const userDevicesRelations = relations(userDevices, ({ one }) => ({
+  user: one(users, {
+    fields: [userDevices.userId],
+    references: [users.id],
+  }),
+  device: one(devices, {
+    fields: [userDevices.deviceId],
+    references: [devices.id],
   }),
 }));
 
@@ -315,6 +373,26 @@ export const insertBtcPriceHistorySchema = createInsertSchema(btcPriceHistory).o
   timestamp: true,
 });
 
+export const insertDeviceSchema = createInsertSchema(devices).omit({
+  id: true,
+  firstSeen: true,
+  lastSeen: true,
+  registrations: true,
+  riskScore: true,
+  blocked: true,
+  signalsVersion: true,
+});
+
+export const insertDeviceFingerprintSchema = createInsertSchema(deviceFingerprints).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertUserDeviceSchema = createInsertSchema(userDevices).omit({
+  id: true,
+  firstLinked: true,
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type Deposit = typeof deposits.$inferSelect;
@@ -336,3 +414,9 @@ export type BtcStakingReward = typeof btcStakingRewards.$inferSelect;
 export type InsertBtcStakingReward = z.infer<typeof insertBtcStakingRewardSchema>;
 export type BtcPriceHistory = typeof btcPriceHistory.$inferSelect;
 export type InsertBtcPriceHistory = z.infer<typeof insertBtcPriceHistorySchema>;
+export type Device = typeof devices.$inferSelect;
+export type InsertDevice = z.infer<typeof insertDeviceSchema>;
+export type DeviceFingerprint = typeof deviceFingerprints.$inferSelect;
+export type InsertDeviceFingerprint = z.infer<typeof insertDeviceFingerprintSchema>;
+export type UserDevice = typeof userDevices.$inferSelect;
+export type InsertUserDevice = z.infer<typeof insertUserDeviceSchema>;

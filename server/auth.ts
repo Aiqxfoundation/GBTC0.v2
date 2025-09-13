@@ -12,6 +12,7 @@ declare global {
     interface User extends SelectUser {}
     interface Request {
       user?: SelectUser;
+      isAuthenticated(): boolean;
     }
   }
 }
@@ -78,6 +79,12 @@ export function setupAuth(app: Express) {
 
   app.set("trust proxy", 1);
   app.use(session(sessionSettings));
+
+  // Polyfill req.isAuthenticated() since we're not using Passport
+  app.use((req, _res, next) => {
+    req.isAuthenticated = () => Boolean(req.session?.userId && req.user);
+    next();
+  });
 
   // Helper middleware to set user on request
   app.use((req, res, next) => {
