@@ -193,7 +193,7 @@ Account Details:
                       />
                     </div>
                     <div>
-                      <Label htmlFor="login-access-key" className="flex items-center gap-2">
+                      <Label htmlFor="login-access-key" className="flex items-center gap-2 mb-3">
                         Access Key
                         <span className="text-[#f7931a] text-xs">(GBTC-XXXXX-XXXXX-XXXXX-XXXXX)</span>
                       </Label>
