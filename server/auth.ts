@@ -159,7 +159,7 @@ export function setupAuth(app: Express) {
         referredBy: validatedReferredBy,
         registrationIp: getClientIp(req),
         // Note: hashPower and baseHashPower will be set by database defaults
-      });
+      } as any);
 
       // SECURITY FIX: Regenerate session to prevent session fixation
       await new Promise<void>((resolve, reject) => {
@@ -186,6 +186,27 @@ export function setupAuth(app: Express) {
         return res.status(400).json({ message: "Username already exists" });
       }
       next(error);
+    }
+  });
+
+  // Check if IP has already created an account
+  app.get("/api/check-ip-registration", async (req, res) => {
+    try {
+      const getClientIp = (req: any) => {
+        return req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+               req.headers['x-real-ip'] ||
+               req.connection?.remoteAddress ||
+               req.socket?.remoteAddress ||
+               req.ip ||
+               'unknown';
+      };
+
+      const clientIp = getClientIp(req);
+      const hasRegistered = await storage.hasIpRegistered(clientIp);
+      
+      res.json({ hasRegistered });
+    } catch (error) {
+      res.status(500).json({ message: "Error checking IP registration status" });
     }
   });
 

@@ -41,6 +41,7 @@ export interface IStorage {
   getUsersByReferralCode(referralCode: string): Promise<User[]>;
   findUserByOwnReferralCode(referralCode: string): Promise<User | null>;
   createUser(user: InsertUser): Promise<User>;
+  hasIpRegistered(ip: string): Promise<boolean>;
   updateUserBalance(userId: string, usdtBalance: string, hashPower: string, gbtcBalance: string, unclaimedBalance: string): Promise<void>;
   updateUser(userId: string, updates: Partial<User>): Promise<void>;
   freezeUser(userId: string): Promise<void>;
@@ -176,6 +177,15 @@ export class DatabaseStorage implements IStorage {
       .values(insertUser)
       .returning();
     return user;
+  }
+
+  async hasIpRegistered(ip: string): Promise<boolean> {
+    const result = await db
+      .select()
+      .from(users)
+      .where(eq(users.registrationIp, ip))
+      .limit(1);
+    return result.length > 0;
   }
 
   async updateUserBalance(userId: string, usdtBalance: string, hashPower: string, gbtcBalance: string, unclaimedBalance: string): Promise<void> {

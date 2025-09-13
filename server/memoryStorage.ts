@@ -229,11 +229,11 @@ export class MemoryStorage implements IStorage {
     const user: User = {
       id: userId,
       username: insertUser.username,
-      password: insertUser.password,
+      accessKey: (insertUser as any).accessKey || '',
       referralCode,
       referredBy: insertUser.referredBy || null,
+      registrationIp: (insertUser as any).registrationIp || null,
       usdtBalance: '0.00',
-
       btcBalance: '0.00000000',
       hashPower: '0.00',
       baseHashPower: '0.00',
@@ -245,12 +245,22 @@ export class MemoryStorage implements IStorage {
       isAdmin: false,
       isFrozen: false,
       isBanned: false,
+      hasStartedMining: false,
       createdAt: new Date()
     };
     
     this.users.set(userId, user);
     this.usersByUsername.set(insertUser.username, userId);
     return user;
+  }
+
+  async hasIpRegistered(ip: string): Promise<boolean> {
+    for (const user of this.users.values()) {
+      if (user.registrationIp === ip) {
+        return true;
+      }
+    }
+    return false;
   }
 
   async updateUserBalance(userId: string, usdtBalance: string, hashPower: string, gbtcBalance: string, unclaimedBalance: string): Promise<void> {
