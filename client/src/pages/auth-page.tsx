@@ -77,8 +77,13 @@ export default function AuthPage() {
   const downloadAccessKey = () => {
     if (!generatedAccessKey) return;
     
-    const content = `${registerForm.username}
-${generatedAccessKey}`;
+    const content = `Username: ${registerForm.username}
+Access Key: ${generatedAccessKey}
+
+IMPORTANT INSTRUCTIONS:
+• Without your correct USERNAME and ACCESS KEY, you cannot access your account
+• Both are unique and required for login
+• Store both safely - we cannot recover them if lost`;
 
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -336,93 +341,57 @@ ${generatedAccessKey}`;
 
       {/* Access Key Display Modal */}
       <Dialog open={showKeyModal} onOpenChange={() => {}}>
-        <DialogContent className="max-w-2xl bg-gray-950 border-2 border-[#f7931a]" data-testid="modal-access-key">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-[#f7931a]">
-              <AlertTriangle className="w-5 h-5" />
-              Your Access Key - SAVE THIS NOW!
+        <DialogContent className="max-w-md bg-gray-950 border-2 border-[#f7931a]" data-testid="modal-access-key">
+          <DialogHeader className="pb-3">
+            <DialogTitle className="text-lg text-[#f7931a] flex items-center gap-2">
+              <Key className="w-5 h-5" />
+              Your Access Key
             </DialogTitle>
           </DialogHeader>
           
-          <div className="space-y-6">
-            {/* Critical Warning */}
-            <Alert className="border-2 border-[#f7931a] bg-[#f7931a]/10">
-              <AlertTriangle className="h-4 w-4 text-[#f7931a]" />
-              <AlertDescription className="text-[#f7931a]">
-                <strong>CRITICAL: SAVE YOUR ACCESS KEY NOW!</strong>
-                <br />
-                Once you close this window, we cannot recover it for you.
-              </AlertDescription>
-            </Alert>
-
+          <div className="space-y-4">
             {/* Access Key Display */}
-            <div className="space-y-3">
-              <Label className="text-[#f7931a] font-semibold flex items-center gap-2">
-                <Key className="w-4 h-4" />
-                Your Access Key:
-              </Label>
-              <div className="relative">
-                <Textarea
-                  value={formatAccessKey(generatedAccessKey || "")}
-                  readOnly
-                  className="bg-black border-[#f7931a] font-mono text-[#f7931a] text-lg font-bold text-center"
-                  rows={2}
-                  data-testid="textarea-access-key"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute top-2 right-2 h-6 w-6 p-0 text-gray-400 hover:text-white"
-                  onClick={() => copyToClipboard(generatedAccessKey || "", "Access key")}
-                  data-testid="button-copy-access-key"
-                >
-                  <Copy className="w-4 h-4" />
-                </Button>
+            <div className="bg-black border-2 border-[#f7931a] rounded-lg p-3">
+              <div className="font-mono text-[#f7931a] text-sm font-bold text-center break-all">
+                {formatAccessKey(generatedAccessKey || "")}
               </div>
             </div>
 
-            {/* Download Option */}
-            <Button
-              onClick={downloadAccessKey}
-              className="w-full bg-[#f7931a]/20 hover:bg-[#f7931a]/30 border-2 border-[#f7931a] text-[#f7931a]"
-              data-testid="button-download-key"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Download Access Key as Text File
-            </Button>
-
-            {/* Simplified Instructions */}
-            <div className="border-t border-[#f7931a] pt-4">
-              <Alert className="border-2 border-[#f7931a] bg-[#f7931a]/10">
-                <Key className="h-4 w-4 text-[#f7931a]" />
-                <AlertDescription className="text-[#f7931a]">
-                  <strong>Store Your Access Key Safely!</strong>
-                  <br />
-                  You'll need it to login. Keep it secure - we cannot recover it.
-                </AlertDescription>
-              </Alert>
-            </div>
-
-            {/* Complete Registration - Simplified */}
-            <div className="space-y-3">
+            {/* Action Buttons */}
+            <div className="space-y-2">
               <Button
                 onClick={() => copyToClipboard(generatedAccessKey || "", "Access key copied!")}
-                className="w-full bg-[#f7931a]/20 hover:bg-[#f7931a]/30 border-2 border-[#f7931a] text-[#f7931a] font-bold"
+                className="w-full bg-[#f7931a]/20 hover:bg-[#f7931a]/30 border border-[#f7931a] text-[#f7931a] font-bold"
                 data-testid="button-copy-key"
               >
                 <Copy className="w-4 h-4 mr-2" />
                 COPY ACCESS KEY
               </Button>
+
+              <Button
+                onClick={downloadAccessKey}
+                className="w-full bg-[#f7931a]/20 hover:bg-[#f7931a]/30 border border-[#f7931a] text-[#f7931a]"
+                data-testid="button-download-key"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download as Text File
+              </Button>
               
               <Button
                 onClick={handleCompleteRegistration}
-                className="w-full bg-[#f7931a] hover:bg-[#ff9416] text-black font-bold"
+                className="w-full bg-[#f7931a] hover:bg-[#e5851a] text-black font-bold"
                 data-testid="button-complete-registration"
               >
                 <ArrowRight className="w-4 h-4 mr-2" />
-                I'VE COPIED IT - START MINING!
+                I'VE SAVED IT - CONTINUE
               </Button>
+            </div>
+
+            {/* Warning */}
+            <div className="text-center">
+              <p className="text-[#f7931a] text-xs">
+                ⚠️ Save this now - we cannot recover it later!
+              </p>
             </div>
           </div>
         </DialogContent>
