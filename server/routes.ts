@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { setupMining } from "./mining";
 import type { Request, Response, NextFunction, Express } from "express";
-import { insertDepositSchema, insertWithdrawalSchema } from "@shared/schema";
+import { insertDepositSchema, insertWithdrawalSchema, insertDeviceFingerprintSchema } from "@shared/schema";
 import { createServer } from "http";
 
 export async function registerRoutes(app: Express) {
@@ -16,6 +16,116 @@ export async function registerRoutes(app: Express) {
   
   // Create HTTP server
   const server = createServer(app);
+  
+  // Device fingerprinting endpoints
+  app.post("/api/device/check", async (req, res, next) => {
+    try {
+      const deviceCheckSchema = z.object({
+        serverDeviceId: z.string().min(1),
+        fingerprints: insertDeviceFingerprintSchema.omit({ deviceId: true })
+      });
+      
+      const { serverDeviceId, fingerprints } = deviceCheckSchema.parse(req.body);
+      
+      // Get client IP and basic network info
+      const clientIp = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for']?.toString().split(',')[0];
+      
+      // Check device and determine if it can register
+      const result = await storage.upsertDevice({
+        serverDeviceId,
+        lastIp: clientIp,
+        fingerprints
+      });
+      
+      res.json({
+        deviceId: result.device.id,
+        canRegister: result.canRegister,
+        registrations: result.device.registrations,
+        blocked: result.device.blocked,
+        riskScore: result.device.riskScore
+      });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ 
+          message: "Invalid device data format",
+          errors: error.errors 
+        });
+      }
+      next(error);
+    }
+  });
+
+  app.post("/api/device/link", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const linkSchema = z.object({
+        deviceId: z.string().min(1)
+      });
+      
+      const { deviceId } = linkSchema.parse(req.body);
+      
+      // Link user to device (called after successful registration)
+      await storage.linkUserToDevice(req.user!.id, deviceId);
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ 
+          message: "Invalid device ID format" 
+        });
+      }
+      next(error);
+    }
+  });
+
+  // Admin device management endpoints
+  app.post("/api/admin/device/:deviceId/block", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated() || !req.user!.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { deviceId } = req.params;
+      await storage.blockDevice(deviceId);
+      
+      res.json({ success: true, message: "Device has been blocked" });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/admin/device/:deviceId/allowlist", async (req, res, next) => {
+    try {
+      if (!req.isAuthenticated() || !req.user!.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const allowlistSchema = z.object({
+        maxRegistrations: z.number().min(1).max(10).optional().default(2)
+      });
+      
+      const { maxRegistrations } = allowlistSchema.parse(req.body);
+      const { deviceId } = req.params;
+      
+      await storage.allowlistDevice(deviceId, maxRegistrations);
+      
+      res.json({ 
+        success: true, 
+        message: `Device has been allowlisted with ${maxRegistrations} max registrations` 
+      });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ 
+          message: "Invalid allowlist parameters" 
+        });
+      }
+      next(error);
+    }
+  });
+  
   // Get all users (admin only)
   app.get("/api/users", async (req, res, next) => {
     try {
