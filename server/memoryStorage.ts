@@ -9,7 +9,13 @@ import {
   type SystemSetting,
   type UnclaimedBlock,
   type Transfer,
-  type MinerActivity
+  type MinerActivity,
+  type Device,
+  type InsertDevice,
+  type DeviceFingerprint,
+  type InsertDeviceFingerprint,
+  type UserDevice,
+  type InsertUserDevice
 } from "@shared/schema";
 import { IStorage } from "./storage";
 import session from "express-session";
@@ -35,6 +41,12 @@ export class MemoryStorage implements IStorage {
   private lastDepositTime: Map<string, Date> = new Map(); // userId -> last deposit timestamp
   private lastWithdrawalTime: Map<string, Date> = new Map(); // userId -> last withdrawal timestamp
   private btcConversions: Map<string, any[]> = new Map(); // userId -> BTC/USDT conversions
+  
+  // Device fingerprinting storage
+  private devices: Map<string, Device> = new Map(); // deviceId -> Device
+  private devicesByServerDeviceId: Map<string, string> = new Map(); // serverDeviceId -> deviceId  
+  private deviceFingerprints: Map<string, DeviceFingerprint[]> = new Map(); // deviceId -> fingerprints[]
+  private userDevices: Map<string, string[]> = new Map(); // userId -> deviceId[]
   
   sessionStore: session.Store;
 
@@ -1138,6 +1150,139 @@ export class MemoryStorage implements IStorage {
     const user = this.users.get(userId);
     if (user) {
       (user as any).btcBalance = btcBalance;
+    }
+  }
+
+  // Device Fingerprinting methods
+  async upsertDevice(deviceData: { 
+    serverDeviceId: string; 
+    lastIp?: string; 
+    asn?: string; 
+    fingerprints: InsertDeviceFingerprint 
+  }): Promise<{ device: Device; canRegister: boolean }> {
+    const { serverDeviceId, lastIp, asn, fingerprints } = deviceData;
+    
+    // Check if device already exists by serverDeviceId
+    let deviceId = this.devicesByServerDeviceId.get(serverDeviceId);
+    let device: Device;
+
+    if (!deviceId) {
+      // Check for matching fingerprints first
+      const matchingDevice = await this.findMatchingDevice(fingerprints);
+      
+      if (matchingDevice) {
+        // Update existing device with new serverDeviceId
+        device = { 
+          ...matchingDevice, 
+          serverDeviceId, 
+          lastSeen: new Date(),
+          lastIp: lastIp || null,
+          asn: asn || null
+        };
+        this.devices.set(matchingDevice.id, device);
+        this.devicesByServerDeviceId.set(serverDeviceId, matchingDevice.id);
+      } else {
+        // Create new device
+        deviceId = 'device-' + randomBytes(8).toString('hex');
+        device = {
+          id: deviceId,
+          serverDeviceId,
+          firstSeen: new Date(),
+          lastSeen: new Date(),
+          lastIp: lastIp || null,
+          asn: asn || null,
+          registrations: 0,
+          riskScore: 0,
+          blocked: false,
+          signalsVersion: '1.0'
+        };
+        this.devices.set(deviceId, device);
+        this.devicesByServerDeviceId.set(serverDeviceId, deviceId);
+      }
+
+      // Add fingerprints
+      const fingerprint: DeviceFingerprint = {
+        id: 'fp-' + randomBytes(8).toString('hex'),
+        deviceId,
+        ...fingerprints,
+        createdAt: new Date()
+      };
+      
+      const existingFingerprints = this.deviceFingerprints.get(deviceId) || [];
+      this.deviceFingerprints.set(deviceId, [...existingFingerprints, fingerprint]);
+    } else {
+      // Update existing device
+      device = this.devices.get(deviceId)!;
+      device = { 
+        ...device, 
+        lastSeen: new Date(),
+        lastIp: lastIp || null,
+        asn: asn || null
+      };
+      this.devices.set(deviceId, device);
+    }
+
+    const canRegister = !device.blocked && device.registrations === 0;
+    return { device, canRegister };
+  }
+
+  async findMatchingDevice(fingerprints: Omit<InsertDeviceFingerprint, 'deviceId'>): Promise<Device | null> {
+    // Check for exact stable hash match (highest confidence)
+    if (fingerprints.stableHash) {
+      for (const [deviceId, fpList] of this.deviceFingerprints.entries()) {
+        for (const fp of fpList) {
+          if (fp.stableHash === fingerprints.stableHash) {
+            return this.devices.get(deviceId) || null;
+          }
+        }
+      }
+    }
+
+    // Check for WebGL + Fonts combination (high confidence)
+    if (fingerprints.webglHash && fingerprints.fontsHash) {
+      for (const [deviceId, fpList] of this.deviceFingerprints.entries()) {
+        for (const fp of fpList) {
+          if (fp.webglHash === fingerprints.webglHash && fp.fontsHash === fingerprints.fontsHash) {
+            return this.devices.get(deviceId) || null;
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  async linkUserToDevice(userId: string, deviceId: string): Promise<void> {
+    // Check if link already exists
+    const userDevicesList = this.userDevices.get(userId) || [];
+    
+    if (!userDevicesList.includes(deviceId)) {
+      userDevicesList.push(deviceId);
+      this.userDevices.set(userId, userDevicesList);
+    }
+
+    // Increment device registration count
+    const device = this.devices.get(deviceId);
+    if (device) {
+      device.registrations += 1;
+      this.devices.set(deviceId, device);
+    }
+  }
+
+  async blockDevice(deviceId: string): Promise<void> {
+    const device = this.devices.get(deviceId);
+    if (device) {
+      device.blocked = true;
+      this.devices.set(deviceId, device);
+    }
+  }
+
+  async allowlistDevice(deviceId: string, maxRegistrations: number = 2): Promise<void> {
+    const device = this.devices.get(deviceId);
+    if (device) {
+      device.blocked = false;
+      device.registrations = 0; // Reset registrations for allowlisted device
+      this.devices.set(deviceId, device);
     }
   }
 }

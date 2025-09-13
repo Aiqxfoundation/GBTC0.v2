@@ -10,6 +10,9 @@ import {
   btcStakes,
   btcStakingRewards,
   btcPriceHistory,
+  devices,
+  deviceFingerprints,
+  userDevices,
   type User, 
   type InsertUser, 
   type Deposit, 
@@ -23,7 +26,13 @@ import {
   type MinerActivity,
   type BtcStake,
   type BtcStakingReward,
-  type BtcPriceHistory
+  type BtcPriceHistory,
+  type Device,
+  type InsertDevice,
+  type DeviceFingerprint,
+  type InsertDeviceFingerprint,
+  type UserDevice,
+  type InsertUserDevice
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql } from "drizzle-orm";
@@ -133,6 +142,18 @@ export interface IStorage {
   getSystemHashratePrice(): Promise<string>; // Price of 1 GH/s in BTC
   getUserBtcBalance(userId: string): Promise<string>;
   updateUserBtcBalance(userId: string, btcBalance: string): Promise<void>;
+
+  // Device Fingerprinting methods
+  upsertDevice(deviceData: { 
+    serverDeviceId: string; 
+    lastIp?: string; 
+    asn?: string; 
+    fingerprints: InsertDeviceFingerprint 
+  }): Promise<{ device: Device; canRegister: boolean }>;
+  findMatchingDevice(fingerprints: Omit<InsertDeviceFingerprint, 'deviceId'>): Promise<Device | null>;
+  linkUserToDevice(userId: string, deviceId: string): Promise<void>;
+  blockDevice(deviceId: string): Promise<void>;
+  allowlistDevice(deviceId: string, maxRegistrations?: number): Promise<void>;
   
   sessionStore: session.Store;
 }
@@ -958,6 +979,145 @@ export class DatabaseStorage implements IStorage {
       .update(users)
       .set({ btcBalance })
       .where(eq(users.id, userId));
+  }
+
+  // Device Fingerprinting methods
+  async upsertDevice(deviceData: { 
+    serverDeviceId: string; 
+    lastIp?: string; 
+    asn?: string; 
+    fingerprints: InsertDeviceFingerprint 
+  }): Promise<{ device: Device; canRegister: boolean }> {
+    const { serverDeviceId, lastIp, asn, fingerprints } = deviceData;
+    
+    // Check if device already exists
+    let [device] = await db
+      .select()
+      .from(devices)
+      .where(eq(devices.serverDeviceId, serverDeviceId));
+
+    if (!device) {
+      // Check for matching fingerprints first
+      const matchingDevice = await this.findMatchingDevice(fingerprints);
+      
+      if (matchingDevice) {
+        // Update existing device with new serverDeviceId
+        await db
+          .update(devices)
+          .set({ 
+            serverDeviceId, 
+            lastSeen: new Date(),
+            lastIp: lastIp || null,
+            asn: asn || null
+          })
+          .where(eq(devices.id, matchingDevice.id));
+        
+        device = { ...matchingDevice, serverDeviceId, lastSeen: new Date(), lastIp, asn };
+      } else {
+        // Create new device
+        [device] = await db
+          .insert(devices)
+          .values({
+            serverDeviceId,
+            lastIp: lastIp || null,
+            asn: asn || null,
+          })
+          .returning();
+      }
+
+      // Add fingerprints
+      await db
+        .insert(deviceFingerprints)
+        .values({
+          ...fingerprints,
+          deviceId: device.id,
+        });
+    } else {
+      // Update existing device
+      await db
+        .update(devices)
+        .set({ 
+          lastSeen: new Date(),
+          lastIp: lastIp || null,
+          asn: asn || null
+        })
+        .where(eq(devices.id, device.id));
+    }
+
+    const canRegister = !device.blocked && device.registrations === 0;
+    return { device, canRegister };
+  }
+
+  async findMatchingDevice(fingerprints: Omit<InsertDeviceFingerprint, 'deviceId'>): Promise<Device | null> {
+    // Check for exact stable hash match (highest confidence)
+    if (fingerprints.stableHash) {
+      const exactMatch = await db
+        .select({ device: devices })
+        .from(deviceFingerprints)
+        .innerJoin(devices, eq(deviceFingerprints.deviceId, devices.id))
+        .where(eq(deviceFingerprints.stableHash, fingerprints.stableHash))
+        .limit(1);
+      
+      if (exactMatch.length > 0) {
+        return exactMatch[0].device;
+      }
+    }
+
+    // Check for WebGL + Fonts combination (high confidence)
+    if (fingerprints.webglHash && fingerprints.fontsHash) {
+      const webglFontsMatch = await db
+        .select({ device: devices })
+        .from(deviceFingerprints)
+        .innerJoin(devices, eq(deviceFingerprints.deviceId, devices.id))
+        .where(sql`${deviceFingerprints.webglHash} = ${fingerprints.webglHash} AND ${deviceFingerprints.fontsHash} = ${fingerprints.fontsHash}`)
+        .limit(1);
+      
+      if (webglFontsMatch.length > 0) {
+        return webglFontsMatch[0].device;
+      }
+    }
+
+    return null;
+  }
+
+  async linkUserToDevice(userId: string, deviceId: string): Promise<void> {
+    // Check if link already exists
+    const existing = await db
+      .select()
+      .from(userDevices)
+      .where(sql`${userDevices.userId} = ${userId} AND ${userDevices.deviceId} = ${deviceId}`)
+      .limit(1);
+
+    if (existing.length === 0) {
+      await db
+        .insert(userDevices)
+        .values({ userId, deviceId });
+    }
+
+    // Increment device registration count
+    await db
+      .update(devices)
+      .set({ 
+        registrations: sql`${devices.registrations} + 1`
+      })
+      .where(eq(devices.id, deviceId));
+  }
+
+  async blockDevice(deviceId: string): Promise<void> {
+    await db
+      .update(devices)
+      .set({ blocked: true })
+      .where(eq(devices.id, deviceId));
+  }
+
+  async allowlistDevice(deviceId: string, maxRegistrations: number = 2): Promise<void> {
+    await db
+      .update(devices)
+      .set({ 
+        blocked: false,
+        registrations: 0 // Reset registrations for allowlisted device
+      })
+      .where(eq(devices.id, deviceId));
   }
 }
 
