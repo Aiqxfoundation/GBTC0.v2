@@ -69,10 +69,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
     onError: (error: Error) => {
+      // Bitcoin-themed error toast
       toast({
-        title: "Login failed",
-        description: error.message,
+        title: "🔐 Mining Access Denied",
+        description: `⚡ ${error.message}. Please check your access key format: GBTC-XXXXX-XXXXX-XXXXX-XXXXX`,
         variant: "destructive",
+        className: "border-[#f7931a] bg-gray-900 text-white",
+        style: {
+          border: "2px solid #f7931a",
+          background: "linear-gradient(135deg, #1a1a1a 0%, #2d1810 100%)",
+          boxShadow: "0 0 20px rgba(247, 147, 26, 0.3)",
+        }
       });
     },
   });
