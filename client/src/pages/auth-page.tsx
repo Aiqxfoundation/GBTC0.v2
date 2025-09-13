@@ -77,15 +77,28 @@ export default function AuthPage() {
   const downloadAccessKey = () => {
     if (!generatedAccessKey) return;
     
-    const content = `Username: ${registerForm.username}
+    const content = `=======================================
+           GBTC ACCESS CREDENTIALS
+=======================================
+
+Username: ${registerForm.username}
 Access Key: ${generatedAccessKey}
 
-IMPORTANT INSTRUCTIONS:
-• Without your correct USERNAME and ACCESS KEY, you cannot access your account
-• Both are unique and required for login
-• Store both safely - we cannot recover them if lost`;
+=======================================
+         IMPORTANT INSTRUCTIONS
+=======================================
 
-    const blob = new Blob([content], { type: 'text/plain' });
+- Without your correct USERNAME and ACCESS KEY, you cannot access your account
+- Both are unique and required for login  
+- Store both safely - we cannot recover them if lost
+- Keep this file secure and do not share with anyone
+
+=======================================
+         For support, contact us at:
+         support@gbtc-mining.com
+=======================================`;
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
