@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -17,6 +16,7 @@ export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const [showRegister, setShowRegister] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: "", accessKey: "" });
   const [registerForm, setRegisterForm] = useState({ username: "", referredBy: "" });
   const [showLoginAccessKey, setShowLoginAccessKey] = useState(false);
@@ -97,20 +97,18 @@ ${generatedAccessKey}`;
   };
 
   const handleCompleteRegistration = () => {
-    // Close modal and switch to login tab - user must login manually
+    // Close modal and switch to login form - user must login manually
     setShowKeyModal(false);
-    toast({
-      title: "Access key saved!",
-      description: "Now please login with your username and access key to start mining.",
-    });
+    setShowRegister(false);
     
-    // Switch to login tab
-    setTimeout(() => {
-      const loginTab = document.querySelector('[value="login"]') as HTMLButtonElement;
-      if (loginTab) {
-        loginTab.click();
-      }
-    }, 500);
+    // Pre-fill username in login form
+    setLoginForm(prev => ({ ...prev, username: registerForm.username }));
+    
+    toast({
+      title: "Account Created Successfully!",
+      description: "Now please login with your username and access key to start mining.",
+      className: "border-[#f7931a] bg-gray-900 text-white",
+    });
   };
 
   const handleLogin = (e: React.FormEvent) => {
@@ -139,98 +137,106 @@ ${generatedAccessKey}`;
             <p className="text-gray-400 text-sm">Secure Access Key Authentication</p>
           </div>
 
-          {/* Auth Tabs */}
-          <Tabs defaultValue="register" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 bg-gray-900">
-              <TabsTrigger value="login" data-testid="tab-login">Login</TabsTrigger>
-              <TabsTrigger value="register" data-testid="tab-register">Register</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="login">
-              <Card className="border-[#f7931a]/20 bg-gray-950">
-                <CardHeader>
-                  <CardTitle className="text-center text-white flex items-center justify-center gap-2">
-                    <Key className="w-5 h-5" />
-                    Sign In with Access Key
-                  </CardTitle>
-                  <p className="text-xs text-center text-gray-400">
-                    Enter your username and access key to access your account
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleLogin} className="space-y-4">
-                    <div>
-                      <Label htmlFor="login-username">Username</Label>
-                      <Input
-                        id="login-username"
-                        type="text"
-                        placeholder="Enter your username"
-                        value={loginForm.username}
-                        onChange={(e) => setLoginForm(prev => ({ ...prev, username: e.target.value }))}
+          {/* Single Auth Form */}
+          {!showRegister ? (
+            /* Login Form */
+            <Card className="border-[#f7931a]/20 bg-gray-950">
+              <CardHeader>
+                <CardTitle className="text-center text-white flex items-center justify-center gap-2">
+                  <Key className="w-5 h-5" />
+                  Sign In with Access Key
+                </CardTitle>
+                <p className="text-xs text-center text-gray-400">
+                  Enter your username and access key to access your account
+                </p>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div>
+                    <Label htmlFor="login-username">Username</Label>
+                    <Input
+                      id="login-username"
+                      type="text"
+                      placeholder="Enter your username"
+                      value={loginForm.username}
+                      onChange={(e) => setLoginForm(prev => ({ ...prev, username: e.target.value }))}
+                      required
+                      autoComplete="username"
+                      className="bg-black border-gray-800"
+                      data-testid="input-login-username"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="login-access-key" className="flex items-center gap-2 mb-3">
+                      Access Key
+                      <span className="text-[#f7931a] text-xs">(GBTC-XXXXX-XXXXX-XXXXX-XXXXX)</span>
+                    </Label>
+                    <div className="relative">
+                      <Textarea
+                        id="login-access-key"
+                        placeholder="Enter your GBTC access key"
+                        value={loginForm.accessKey}
+                        onChange={(e) => {
+                          const value = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+                          setLoginForm(prev => ({ ...prev, accessKey: value }));
+                        }}
+                        className={`bg-black border-gray-800 font-mono text-sm resize-none ${
+                          showLoginAccessKey ? '' : 'text-security-disc'
+                        }`}
+                        style={showLoginAccessKey ? {} : { WebkitTextSecurity: 'disc', textSecurity: 'disc' } as any}
+                        rows={2}
                         required
-                        autoComplete="username"
-                        className="bg-black border-gray-800"
-                        data-testid="input-login-username"
+                        data-testid="input-login-access-key"
                       />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute top-2 right-2 h-6 w-6 p-0 text-gray-400 hover:text-white"
+                        onClick={() => setShowLoginAccessKey(!showLoginAccessKey)}
+                        data-testid="button-toggle-login-key-visibility"
+                      >
+                        {showLoginAccessKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </Button>
                     </div>
-                    <div>
-                      <Label htmlFor="login-access-key" className="flex items-center gap-2 mb-3">
-                        Access Key
-                        <span className="text-[#f7931a] text-xs">(GBTC-XXXXX-XXXXX-XXXXX-XXXXX)</span>
-                      </Label>
-                      <div className="relative">
-                        <Textarea
-                          id="login-access-key"
-                          placeholder="Enter your GBTC access key"
-                          value={loginForm.accessKey}
-                          onChange={(e) => {
-                            const value = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
-                            setLoginForm(prev => ({ ...prev, accessKey: value }));
-                          }}
-                          className={`bg-black border-gray-800 font-mono text-sm resize-none ${
-                            showLoginAccessKey ? '' : 'text-security-disc'
-                          }`}
-                          style={showLoginAccessKey ? {} : { WebkitTextSecurity: 'disc', textSecurity: 'disc' } as any}
-                          rows={2}
-                          required
-                          data-testid="input-login-access-key"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="absolute top-2 right-2 h-6 w-6 p-0 text-gray-400 hover:text-white"
-                          onClick={() => setShowLoginAccessKey(!showLoginAccessKey)}
-                          data-testid="button-toggle-login-key-visibility"
-                        >
-                          {showLoginAccessKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </Button>
-                      </div>
-                      {loginForm.accessKey && !isValidAccessKey(loginForm.accessKey) && (
-                        <p className="text-red-400 text-xs mt-1">
-                          Access key must be in format: GBTC-XXXXX-XXXXX-XXXXX-XXXXX
-                        </p>
-                      )}
-                    </div>
-                    <Button 
-                      type="submit" 
-                      className="w-full bg-[#f7931a] hover:bg-[#ff9416] text-black font-bold"
-                      disabled={loginMutation.isPending || !isValidAccessKey(loginForm.accessKey)}
-                      data-testid="button-login"
-                    >
-                      {loginMutation.isPending ? (
-                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                      ) : (
-                        <Key className="w-4 h-4 mr-2" />
-                      )}
-                      Sign In Securely
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="register">
+                    {loginForm.accessKey && !isValidAccessKey(loginForm.accessKey) && (
+                      <p className="text-red-400 text-xs mt-1">
+                        Access key must be in format: GBTC-XXXXX-XXXXX-XXXXX-XXXXX
+                      </p>
+                    )}
+                  </div>
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-[#f7931a] hover:bg-[#ff9416] text-black font-bold"
+                    disabled={loginMutation.isPending || !isValidAccessKey(loginForm.accessKey)}
+                    data-testid="button-login"
+                  >
+                    {loginMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    ) : (
+                      <Key className="w-4 h-4 mr-2" />
+                    )}
+                    Sign In Securely
+                  </Button>
+                </form>
+                
+                {/* Create Account Button */}
+                <div className="mt-6 pt-4 border-t border-gray-800">
+                  <p className="text-center text-gray-400 text-sm mb-3">Don't have an account?</p>
+                  <Button
+                    type="button"
+                    onClick={() => setShowRegister(true)}
+                    className="w-full bg-transparent border-2 border-[#f7931a] text-[#f7931a] hover:bg-[#f7931a] hover:text-black font-bold"
+                    data-testid="button-show-register"
+                  >
+                    <Shield className="w-4 h-4 mr-2" />
+                    Create New Account
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            /* Register Form */
               <Card className="border-[#f7931a]/20 bg-gray-950">
                 <CardHeader>
                   <CardTitle className="text-center text-white flex items-center justify-center gap-2">
@@ -243,11 +249,11 @@ ${generatedAccessKey}`;
                 </CardHeader>
                 <CardContent>
                   {/* Enhanced Security Warning */}
-                  <Alert className="mb-4 border-red-500/20 bg-red-950/30">
-                    <AlertTriangle className="h-4 w-4 text-red-500" />
+                  <Alert className="mb-4 border-2 border-[#f7931a] bg-[#f7931a]/10">
+                    <AlertTriangle className="h-4 w-4 text-[#f7931a]" />
                     <AlertDescription className="text-sm">
-                      <strong className="text-red-400">CRITICAL SECURITY WARNING</strong>
-                      <div className="mt-2 space-y-1 text-gray-300">
+                      <strong className="text-[#f7931a]">CRITICAL SECURITY WARNING</strong>
+                      <div className="mt-2 space-y-1 text-[#f7931a]/80">
                         <p>• Your access key is your ONLY way to access your account</p>
                         <p>• There is NO password recovery or account reset option</p>
                         <p>• If you lose your access key, you lose your account forever</p>
@@ -308,10 +314,23 @@ ${generatedAccessKey}`;
                       Generate Secure Access Key
                     </Button>
                   </form>
+                  
+                  {/* Back to Login Button */}
+                  <div className="mt-6 pt-4 border-t border-gray-800">
+                    <p className="text-center text-gray-400 text-sm mb-3">Already have an account?</p>
+                    <Button
+                      type="button"
+                      onClick={() => setShowRegister(false)}
+                      className="w-full bg-transparent border-2 border-[#f7931a] text-[#f7931a] hover:bg-[#f7931a] hover:text-black font-bold"
+                      data-testid="button-show-login"
+                    >
+                      <Key className="w-4 h-4 mr-2" />
+                      Back to Login
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
-            </TabsContent>
-          </Tabs>
+          )}
         </div>
       </div>
 
