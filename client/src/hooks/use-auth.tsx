@@ -69,10 +69,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
     onError: (error: Error) => {
-      // Bitcoin-themed error toast
+      // Professional Bitcoin-themed error toast
       toast({
-        title: "🔐 Mining Access Denied",
-        description: `⚡ ${error.message}. Please check your access key format: GBTC-XXXXX-XXXXX-XXXXX-XXXXX`,
+        title: "🔐 Authentication Failed",
+        description: "Invalid username or access key. Please verify your credentials and ensure your access key follows the format: GBTC-XXXXX-XXXXX-XXXXX-XXXXX",
         variant: "destructive",
         className: "border-[#f7931a] bg-gray-900 text-white",
         style: {
