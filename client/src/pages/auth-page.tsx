@@ -381,8 +381,14 @@ Access Key: ${generatedAccessKey}
       </div>
 
       {/* Access Key Display Modal */}
-      <Dialog open={showKeyModal} onOpenChange={() => {}}>
-        <DialogContent className="max-w-md bg-gray-950 border-2 border-[#f7931a]" data-testid="modal-access-key">
+      <Dialog open={showKeyModal} onOpenChange={() => {}} modal>
+        <DialogContent 
+          className="max-w-md bg-gray-950 border-2 border-[#f7931a] [&>button]:hidden" 
+          data-testid="modal-access-key"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
           <DialogHeader className="pb-3">
             <DialogTitle className="text-lg text-[#f7931a] flex items-center gap-2">
               <Key className="w-5 h-5" />
