@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertTriangle, Shield, Eye, Users, DollarSign, FileText, UserCheck } from "lucide-react";
+import { AlertTriangle, Eye, Users, DollarSign, FileText, UserCheck } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useState } from "react";
@@ -10,10 +10,9 @@ import { useState } from "react";
 interface DisclaimerModalProps {
   open: boolean;
   onAccept: () => void;
-  onDecline: () => void;
 }
 
-export default function DisclaimerModal({ open, onAccept, onDecline }: DisclaimerModalProps) {
+export default function DisclaimerModal({ open, onAccept }: DisclaimerModalProps) {
   const [isAgreed, setIsAgreed] = useState(false);
 
   return (
@@ -122,18 +121,11 @@ export default function DisclaimerModal({ open, onAccept, onDecline }: Disclaime
             </label>
           </div>
           
-          <div className="flex gap-2">
-            <Button
-              onClick={onDecline}
-              className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs h-8"
-              data-testid="button-decline-disclaimer"
-            >
-              I Do Not Agree
-            </Button>
+          <div className="flex justify-center">
             <Button
               onClick={onAccept}
               disabled={!isAgreed}
-              className={`flex-1 transition-all duration-200 text-xs h-8 font-bold ${
+              className={`px-8 transition-all duration-200 text-xs h-8 font-bold ${
                 isAgreed 
                   ? "bg-[#f7931a] hover:bg-[#ff9416] text-black shadow-lg" 
                   : "bg-gray-600 text-gray-400 cursor-not-allowed"
