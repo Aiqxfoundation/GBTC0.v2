@@ -23,6 +23,16 @@ declare module 'express-session' {
   }
 }
 
+// Get client IP address helper function
+function getClientIp(req: any): string {
+  return req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+         req.headers['x-real-ip'] ||
+         req.connection?.remoteAddress ||
+         req.socket?.remoteAddress ||
+         req.ip ||
+         'unknown';
+}
+
 // Generate unique access key in format GBTC-XXXXX-XXXXX-XXXXX-XXXXX
 function generateUniqueAccessKey(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -117,14 +127,6 @@ export function setupAuth(app: Express) {
       }
 
       // Get client IP for device tracking
-      const getClientIp = (req: any) => {
-        return req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
-               req.headers['x-real-ip'] ||
-               req.connection?.remoteAddress ||
-               req.socket?.remoteAddress ||
-               req.ip ||
-               'unknown';
-      };
 
       // Check if device can register
       const deviceResult = await storage.upsertDevice({
@@ -138,7 +140,7 @@ export function setupAuth(app: Express) {
           return res.status(403).json({ 
             message: "This device has been restricted from creating new accounts due to suspicious activity." 
           });
-        } else if (deviceResult.device.registrations > 0) {
+        } else if (deviceResult.device.registrations && deviceResult.device.registrations > 0) {
           return res.status(403).json({ 
             message: "An account has already been created from this device. Each device can only be used to register one account." 
           });
@@ -186,15 +188,6 @@ export function setupAuth(app: Express) {
         // If referral code doesn't exist, we just ignore it (don't throw error)
       }
 
-      // Get client IP address
-      const getClientIp = (req: any) => {
-        return req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
-               req.headers['x-real-ip'] ||
-               req.connection?.remoteAddress ||
-               req.socket?.remoteAddress ||
-               req.ip ||
-               'unknown';
-      };
 
       // Hash the access key for secure storage
       const hashedAccessKey = await hashAccessKey(accessKey);
@@ -242,14 +235,6 @@ export function setupAuth(app: Express) {
   // Check if IP has already created an account
   app.get("/api/check-ip-registration", async (req, res) => {
     try {
-      const getClientIp = (req: any) => {
-        return req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
-               req.headers['x-real-ip'] ||
-               req.connection?.remoteAddress ||
-               req.socket?.remoteAddress ||
-               req.ip ||
-               'unknown';
-      };
 
       const clientIp = getClientIp(req);
       const hasRegistered = await storage.hasIpRegistered(clientIp);
