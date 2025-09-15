@@ -43,7 +43,7 @@ export default function DisclaimerModal({ open, onAccept }: DisclaimerModalProps
             <Alert className="border-2 border-red-500 bg-red-900/30 p-2">
               <AlertTriangle className="h-3 w-3 text-red-400" />
               <AlertDescription className="text-red-300 text-xs">
-                <strong>⚠️ HIGH RISK WARNING:</strong> Bitcoin mining involves substantial risk of loss. Mining profitability fluctuates dramatically based on Bitcoin price, network difficulty, energy costs, and equipment performance. You may lose your entire investment. Only invest what you can afford to lose.
+                <strong>⚠️ EXPERIMENTAL PLATFORM WARNING:</strong> GBTC Mining App is a completely experimental virtual token mining simulation. You may lose all deposited funds. GBTC tokens have no guaranteed value and may become worthless. Participate only with funds you can afford to lose entirely.
               </AlertDescription>
             </Alert>
 
@@ -51,34 +51,40 @@ export default function DisclaimerModal({ open, onAccept }: DisclaimerModalProps
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Users className="w-3 h-3 text-white" />
-                <h3 className="text-sm font-bold text-white">Project Identity & Team</h3>
+                <h3 className="text-sm font-bold text-white">Project Identity & Independence Declaration</h3>
               </div>
               <div className="text-white text-xs pl-5 space-y-1">
-                <p><strong>GBTC Mining Platform</strong> is an experimental cryptocurrency simulation project developed by an anonymous team of cryptocurrency developers and contributors worldwide. <strong>NOT affiliated, endorsed, or connected to:</strong></p>
+                <p><strong>GBTC Mining Platform</strong> is an experimental virtual token mining application developed by independent blockchain developers and innovators. <strong>CRITICAL CLARIFICATIONS:</strong></p>
                 <ul className="ml-3 list-disc space-y-0.5 text-gray-300">
-                  <li>Bitcoin Foundation or Bitcoin official entities</li>
-                  <li>Grayscale Investments LLC or Grayscale Bitcoin Trust (GBTC)</li>
-                  <li>Any securities entities, financial institutions, or regulatory bodies</li>
-                  <li>Government agencies or official cryptocurrency organizations</li>
+                  <li><strong>GBTC is NOT Bitcoin</strong> - GBTC is a newly created experimental token, completely separate from Bitcoin</li>
+                  <li><strong>NOT affiliated with Grayscale Bitcoin Trust (GBTC)</strong> - No connection whatsoever to any existing GBTC securities</li>
+                  <li><strong>Independent Development Team</strong> - We are unregulated blockchain developers and innovators</li>
+                  <li><strong>NO connection to Bitcoin Foundation</strong> - Not endorsed by or connected to any official Bitcoin entities</li>
+                  <li><strong>Virtual Mining Only</strong> - No real electricity, hardware, or energy consumption involved</li>
                 </ul>
-                <p className="mt-1"><strong>Platform Purpose:</strong> Educational simulation for understanding Bitcoin mining economics. Results are theoretical and do not guarantee real-world mining profitability.</p>
+                <p className="mt-1"><strong>Our Vision:</strong> Create a decentralized app-style fair mining ecosystem where users participate, engage, and receive rewards based on their contributions and what they can afford. Everything operates within the app environment only.</p>
               </div>
             </div>
 
             <Separator className="bg-gray-800" />
 
-            {/* KYC & Privacy */}
+            {/* Platform Mechanics */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Eye className="w-3 h-3 text-white" />
-                <h3 className="text-sm font-bold text-white">Identity Verification (KYC) & Privacy Policy</h3>
+                <h3 className="text-sm font-bold text-white">Platform Mechanics & Business Model</h3>
               </div>
               <div className="text-white text-xs pl-5 space-y-1">
-                <p><strong>Privacy-First KYC System:</strong> Our identity verification complies with international KYC/AML regulations while protecting your privacy.</p>
-                <p><strong>What we do:</strong> Live facial verification, device fingerprinting, IP geolocation, regulatory compliance screening, multi-account prevention.</p>
-                <p><strong>What we DON'T store:</strong> No photos, videos, or biometric data. Only hashed device fingerprints and verification tokens are transmitted via encrypted TLS connection.</p>
-                <p><strong>Data Protection:</strong> GDPR/CCPA compliant. Data processed under legal basis of contractual necessity. 30-day deletion policy for unused verification data. No sharing with third parties except regulatory requirements.</p>
-                <p><strong>Compliance:</strong> Platform implements Bank Secrecy Act (BSA), Anti-Money Laundering (AML), and Counter-Terrorism Financing (CTF) measures where applicable.</p>
+                <p><strong>How GBTC Mining Works:</strong></p>
+                <ul className="ml-3 list-disc space-y-0.5 text-gray-300">
+                  <li><strong>Virtual Block-Based Mining</strong> - All mining is simulated within the app, no real energy or hardware</li>
+                  <li><strong>USDT Deposits</strong> - Users deposit USDT to participate in the ecosystem</li>
+                  <li><strong>Hashrate Purchases</strong> - Buy virtual hashrate within the app to earn GBTC tokens</li>
+                  <li><strong>Bitcoin Time Lock & Earn</strong> - Deposit Bitcoin in time-locked positions for additional earnings</li>
+                  <li><strong>In-App Revenue Model</strong> - Platform generates revenue from hashrate purchases and other in-app activities</li>
+                </ul>
+                <p><strong>Token Value Mechanism:</strong> GBTC token value after launch will be determined by revenue generated from in-app purchases, user engagement, platform usage, and overall community interest. <strong>NO GUARANTEED VALUE OR RETURNS.</strong></p>
+                <p><strong>Staker Benefits:</strong> Time-lock BTC stakers receive income distributions from in-app purchase revenues according to our internal allocation model. <strong>Returns not guaranteed and depend on platform performance.</strong></p>
               </div>
             </div>
 
@@ -88,44 +94,44 @@ export default function DisclaimerModal({ open, onAccept }: DisclaimerModalProps
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <DollarSign className="w-3 h-3 text-white" />
-                <h3 className="text-sm font-bold text-white">Investment Risk & Financial Disclosure</h3>
+                <h3 className="text-sm font-bold text-white">Financial Risks & Investment Warnings</h3>
               </div>
               <div className="text-white text-xs pl-5 space-y-1">
                 <Alert className="border border-red-400 bg-red-900/20 p-2 my-2">
                   <AlertDescription className="text-red-300 text-xs">
-                    <strong>NOT INVESTMENT ADVICE:</strong> Information provided does not constitute investment, financial, or trading advice. Consult qualified professionals before making financial decisions.
+                    <strong>NOT INVESTMENT ADVICE:</strong> We provide no investment, financial, or trading advice. This is experimental software. Consult qualified professionals before making any financial decisions.
                   </AlertDescription>
                 </Alert>
-                <p><strong>Critical Financial Risks:</strong></p>
+                <p><strong>Critical Platform Risks:</strong></p>
                 <ul className="ml-3 list-disc space-y-0.5 text-gray-300">
-                  <li><strong>Total Loss Risk:</strong> You may lose all deposited funds</li>
-                  <li><strong>Market Volatility:</strong> Cryptocurrency values fluctuate unpredictably</li>
-                  <li><strong>Mining Difficulty:</strong> Bitcoin network difficulty adjusts, affecting profitability</li>
-                  <li><strong>Energy Costs:</strong> Electricity prices directly impact mining returns</li>
-                  <li><strong>Equipment Depreciation:</strong> Mining hardware loses value rapidly</li>
-                  <li><strong>Regulatory Risk:</strong> Government regulations may change mining legality</li>
-                  <li><strong>No FDIC Insurance:</strong> Funds not protected by government insurance</li>
-                  <li><strong>Liquidity Risk:</strong> Inability to exit positions during market stress</li>
+                  <li><strong>Total Loss Risk:</strong> All deposited USDT, Bitcoin, and earned GBTC tokens may become worthless</li>
+                  <li><strong>No Guaranteed Profits:</strong> We make no commitments to profits, returns, or token value appreciation</li>
+                  <li><strong>Experimental Nature:</strong> Platform is in experimental phase with potential bugs, failures, or complete shutdown</li>
+                  <li><strong>Token Liquidity Risk:</strong> GBTC tokens may have no market or trading value after launch</li>
+                  <li><strong>Revenue Dependency:</strong> Token value depends entirely on in-app purchase revenues which may be insufficient</li>
+                  <li><strong>Platform Shutdown Risk:</strong> Developers may discontinue platform at any time</li>
+                  <li><strong>No Insurance or Guarantees:</strong> No FDIC, SIPC, or any insurance protection</li>
+                  <li><strong>Smart Contract Risk:</strong> Potential bugs or vulnerabilities in blockchain code</li>
                 </ul>
-                <p><strong>Tax Obligations:</strong> Mining rewards may be taxable income. Users responsible for tax compliance in their jurisdiction.</p>
+                <p><strong>User Responsibility:</strong> You invest and participate entirely at your own risk and decision. You are responsible for all tax implications and regulatory compliance in your jurisdiction.</p>
               </div>
             </div>
 
             <Separator className="bg-gray-800" />
 
-            {/* Regulatory Compliance */}
+            {/* Regulatory & Legal Status */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <FileText className="w-3 h-3 text-white" />
-                <h3 className="text-sm font-bold text-white">Regulatory Compliance & Legal Framework</h3>
+                <h3 className="text-sm font-bold text-white">Regulatory Status & Legal Framework</h3>
               </div>
               <div className="text-white text-xs pl-5 space-y-1">
-                <p><strong>Jurisdictional Compliance:</strong> Platform operates under evolving cryptocurrency regulations. User access may be restricted based on local laws.</p>
-                <p><strong>Prohibited Jurisdictions:</strong> Service unavailable in countries where cryptocurrency mining is banned or restricted. Users must verify local compliance.</p>
-                <p><strong>US Regulations:</strong> Platform complies with FinCEN MSB requirements, BSA reporting, and state money transmission laws where applicable.</p>
-                <p><strong>International Framework:</strong> EU MiCA regulations, UK FCA guidelines, and other international frameworks may apply based on user location.</p>
-                <p><strong>Environmental Disclosure:</strong> Mining operations consume significant energy. Platform encourages renewable energy use but cannot guarantee environmental impact.</p>
-                <p><strong>Force Majeure:</strong> Platform not liable for disruptions due to regulatory changes, network issues, power outages, or acts of God.</p>
+                <p><strong>Unregulated Experimental Platform:</strong> We are independent blockchain developers and innovators. This platform is NOT regulated by any financial authority.</p>
+                <p><strong>No Regulatory Oversight:</strong> Platform operates without SEC, CFTC, FinCEN, or any regulatory approval or oversight.</p>
+                <p><strong>Geographic Restrictions:</strong> Service may be unavailable in certain jurisdictions. Users must verify local legal compliance independently.</p>
+                <p><strong>No Regulatory Commitments:</strong> We do not commit to compliance with future regulatory frameworks or requirements.</p>
+                <p><strong>Regulatory Change Risk:</strong> Changes in cryptocurrency regulations may affect platform operations or force discontinuation.</p>
+                <p><strong>Developer Protection:</strong> Platform developers disclaim responsibility for regulatory compliance issues arising from user participation.</p>
               </div>
             </div>
 
@@ -138,23 +144,24 @@ export default function DisclaimerModal({ open, onAccept }: DisclaimerModalProps
                 <h3 className="text-sm font-bold text-white">Legal Terms, Liability & User Obligations</h3>
               </div>
               <div className="text-white text-xs pl-5 space-y-1">
-                <p><strong>By using this platform, you agree that:</strong></p>
+                <p><strong>By using this platform, you explicitly agree that:</strong></p>
                 <ul className="ml-3 list-disc space-y-0.5 text-gray-300">
-                  <li>You are 18+ years old and legally competent to enter contracts</li>
-                  <li>You understand this is experimental with substantial financial risks</li>
-                  <li>You will not hold the development team liable for any losses or damages</li>
-                  <li>You comply with all applicable laws in your jurisdiction</li>
-                  <li>You understand cryptocurrency activities may be restricted in your area</li>
-                  <li>You have conducted your own research and due diligence</li>
-                  <li>You will not use the platform for money laundering or illegal activities</li>
-                  <li>You accept full responsibility for tax reporting and compliance</li>
+                  <li>You are 18+ years old and legally capable of entering binding agreements</li>
+                  <li>You understand this is completely experimental with substantial financial risks</li>
+                  <li>You participate entirely at your own risk and decision</li>
+                  <li>You will NOT hold developers liable for any financial losses, damages, or platform failures</li>
+                  <li>You accept full responsibility for regulatory compliance in your jurisdiction</li>
+                  <li>You understand GBTC tokens may have zero value and provide no guaranteed returns</li>
+                  <li>You acknowledge developers make no profit commitments or guarantees</li>
+                  <li>You will not pursue legal action against developers for losses or platform discontinuation</li>
+                  <li>You understand we are not a regulated financial services provider</li>
                 </ul>
-                <p><strong>Liability Limitation:</strong> To the fullest extent permitted by law, platform operators disclaim all liability for direct, indirect, incidental, special, consequential, or punitive damages.</p>
-                <p><strong>Indemnification:</strong> You agree to indemnify and hold harmless the platform, its affiliates, and contributors from any claims arising from your use of the service.</p>
-                <p><strong>Dispute Resolution:</strong> Any disputes subject to binding arbitration under applicable jurisdiction laws. Class action lawsuits waived where permitted.</p>
+                <p><strong>Complete Liability Disclaimer:</strong> Platform developers, contributors, and affiliates disclaim all liability for any direct, indirect, incidental, special, consequential, or punitive damages arising from platform use.</p>
+                <p><strong>Indemnification:</strong> You agree to indemnify and hold harmless all platform developers from any claims, legal actions, or regulatory investigations arising from your use of the service.</p>
+                <p><strong>No Regulatory Assistance:</strong> Developers are not responsible for answering regulatory inquiries or providing compliance assistance related to your platform usage.</p>
                 <Alert className="border border-amber-500 bg-amber-900/20 p-2 my-2">
                   <AlertDescription className="text-amber-300 text-xs">
-                    <strong>Final Acknowledgment:</strong> By proceeding, you confirm you have read, understood, and agree to all terms, risks, and disclaimers. You acknowledge participating entirely at your own risk with full understanding of potential total loss.
+                    <strong>Final User Acknowledgment:</strong> You confirm complete understanding that this is an experimental platform with no guaranteed outcomes. You participate with full awareness of potential total financial loss and regulatory risks. You acknowledge this disclaimer provides developers complete protection from liability.
                   </AlertDescription>
                 </Alert>
               </div>
