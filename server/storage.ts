@@ -1012,7 +1012,7 @@ export class DatabaseStorage implements IStorage {
           })
           .where(eq(devices.id, matchingDevice.id));
         
-        device = { ...matchingDevice, serverDeviceId, lastSeen: new Date(), lastIp, asn };
+        device = { ...matchingDevice, serverDeviceId, lastSeen: new Date(), lastIp: lastIp || null, asn: asn || null };
       } else {
         // Create new device
         [device] = await db

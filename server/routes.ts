@@ -34,7 +34,10 @@ export async function registerRoutes(app: Express) {
       const result = await storage.upsertDevice({
         serverDeviceId,
         lastIp: clientIp,
-        fingerprints
+        fingerprints: {
+          ...fingerprints,
+          deviceId: '' // Will be set by storage
+        }
       });
       
       res.json({

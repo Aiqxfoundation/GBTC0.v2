@@ -12,12 +12,14 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Copy, Download, Eye, EyeOff, Shield, AlertTriangle, Key, ArrowRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getDeviceFingerprint } from "@/lib/fingerprint";
+import MultiStepSignup from "@/components/MultiStepSignup";
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [showRegister, setShowRegister] = useState(false);
+  const [showMultiStepSignup, setShowMultiStepSignup] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: "", accessKey: "" });
   const [registerForm, setRegisterForm] = useState({ username: "", referredBy: "" });
   const [showLoginAccessKey, setShowLoginAccessKey] = useState(false);
@@ -53,6 +55,15 @@ export default function AuthPage() {
   // Redirect if already logged in
   if (user) {
     return <Redirect to="/" />;
+  }
+
+  // Show multi-step signup if active
+  if (showMultiStepSignup) {
+    return (
+      <MultiStepSignup 
+        onBack={() => setShowMultiStepSignup(false)}
+      />
+    );
   }
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -268,7 +279,7 @@ Access Key: ${generatedAccessKey}
                     <p className="text-center text-gray-400 text-sm mb-3">Don't have an account?</p>
                     <Button
                       type="button"
-                      onClick={() => setShowRegister(true)}
+                      onClick={() => setShowMultiStepSignup(true)}
                       className="w-full bg-transparent border-2 border-[#f7931a] text-[#f7931a] hover:bg-[#f7931a] hover:text-black font-bold"
                       data-testid="button-show-register"
                     >

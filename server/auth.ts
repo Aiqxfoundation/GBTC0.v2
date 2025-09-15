@@ -33,6 +33,32 @@ function getClientIp(req: any): string {
          'unknown';
 }
 
+// Generate server-side device fingerprint for KYC verification
+async function generateServerDeviceFingerprint(deviceData: any, clientIp: string): Promise<string> {
+  // Reconstruct device info from client data (without timestamp to match client)
+  const deviceInfo = {
+    serverDeviceId: deviceData.serverDeviceId,
+    stableHash: deviceData.fingerprints?.stableHash || '',
+    volatileHash: deviceData.fingerprints?.volatileHash || '',
+    chUaHash: deviceData.fingerprints?.chUaHash || '',
+    webglHash: deviceData.fingerprints?.webglHash || '',
+    canvasHash: deviceData.fingerprints?.canvasHash || '',
+    fontsHash: deviceData.fingerprints?.fontsHash || '',
+    clientIp: clientIp
+    // Note: No timestamp to avoid mismatch with client-generated fingerprint
+  };
+
+  // Generate fingerprint hash the same way as client
+  const fingerprintData = JSON.stringify(deviceInfo);
+  const fingerprintBuffer = new TextEncoder().encode(fingerprintData);
+  const crypto = await import('crypto');
+  const hashBuffer = crypto.createHash('sha256').update(fingerprintBuffer).digest();
+  
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
 // Generate unique access key in format GBTC-XXXXX-XXXXX-XXXXX-XXXXX
 function generateUniqueAccessKey(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -113,7 +139,7 @@ export function setupAuth(app: Express) {
   // Registration endpoint - generates unique access key
   app.post("/api/register", async (req, res, next) => {
     try {
-      const { username, referredBy, deviceData } = req.body;
+      const { username, referredBy, deviceData, kycData } = req.body;
       
       if (!username) {
         return res.status(400).json({ message: "Please enter a valid username to create your account." });
@@ -126,6 +152,20 @@ export function setupAuth(app: Express) {
         });
       }
 
+      // Validate KYC data
+      if (!kycData || !kycData.deviceFingerprint || !kycData.verificationHash) {
+        return res.status(400).json({
+          message: "Identity verification (KYC) is required for registration. Please complete the KYC process."
+        });
+      }
+
+      // Validate KYC verification hash format (should be 64-char hex string)
+      if (!/^[a-f0-9]{64}$/i.test(kycData.verificationHash)) {
+        return res.status(400).json({
+          message: "Invalid KYC verification data. Please retry the identity verification process."
+        });
+      }
+
       // Get client IP for device tracking
 
       // Check if device can register
@@ -135,6 +175,7 @@ export function setupAuth(app: Express) {
         fingerprints: deviceData.fingerprints
       });
 
+      // CRITICAL SECURITY: Enforce device registration constraints
       if (!deviceResult.canRegister) {
         if (deviceResult.device.blocked) {
           return res.status(403).json({ 
@@ -149,6 +190,17 @@ export function setupAuth(app: Express) {
             message: "This device is not eligible for registration at this time." 
           });
         }
+      }
+
+      // CRITICAL SECURITY: Verify KYC data matches device data
+      // Generate server-side device fingerprint for comparison
+      const serverFingerprint = await generateServerDeviceFingerprint(deviceData, getClientIp(req));
+      
+      // Compare client-provided KYC fingerprint with server-computed fingerprint
+      if (kycData.deviceFingerprint !== serverFingerprint) {
+        return res.status(400).json({
+          message: "KYC verification failed: Device fingerprint mismatch. Please retry the identity verification process."
+        });
       }
 
       // Generate unique access key
@@ -198,6 +250,8 @@ export function setupAuth(app: Express) {
         referralCode: generateReferralCode(),
         referredBy: validatedReferredBy,
         registrationIp: getClientIp(req),
+        kycVerified: true,
+        kycVerificationHash: kycData.verificationHash,
         // Note: hashPower and baseHashPower will be set by database defaults
       } as any);
 

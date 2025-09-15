@@ -26,6 +26,8 @@ type LoginData = {
 type RegisterData = {
   username: string;
   referredBy?: string;
+  deviceData?: any;
+  kycData?: { deviceFingerprint: string; verificationHash: string };
 };
 
 export const AuthContext = createContext<AuthContextType | null>(null);

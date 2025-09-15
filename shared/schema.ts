@@ -24,6 +24,8 @@ export const users = pgTable("users", {
   isFrozen: boolean("is_frozen").default(false),
   isBanned: boolean("is_banned").default(false),
   hasStartedMining: boolean("has_started_mining").default(false),
+  kycVerified: boolean("kyc_verified").default(false),
+  kycVerificationHash: text("kyc_verification_hash"), // Stores verification hash from KYC process
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -313,6 +315,8 @@ export const insertUserSchema = createInsertSchema(users).omit({
   isFrozen: true,
   isBanned: true,
   hasStartedMining: true,
+  kycVerified: true,
+  kycVerificationHash: true,
 }).extend({
   accessKey: z.string().regex(/^GBTC-[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}$/, "Access key must be in format GBTC-XXXXX-XXXXX-XXXXX-XXXXX"),
 });
