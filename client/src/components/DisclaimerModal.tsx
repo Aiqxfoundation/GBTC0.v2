@@ -68,10 +68,45 @@ export default function DisclaimerModal({ open, onAccept }: DisclaimerModalProps
 
             <Separator className="bg-gray-800" />
 
-            {/* Platform Mechanics */}
+            {/* KYC & Data Privacy Risks */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Eye className="w-3 h-3 text-white" />
+                <h3 className="text-sm font-bold text-white">KYC & Data Privacy Risks</h3>
+              </div>
+              <div className="text-white text-xs pl-5 space-y-1">
+                <Alert className="border border-amber-500 bg-amber-900/20 p-2 my-2">
+                  <AlertDescription className="text-amber-300 text-xs">
+                    <strong>DATA SECURITY NOTICE:</strong> No platform is 100% risk-free from data breaches, hacks, or security vulnerabilities. Participate knowing data risks exist.
+                  </AlertDescription>
+                </Alert>
+                <p><strong>Face KYC Verification Process:</strong></p>
+                <ul className="ml-3 list-disc space-y-0.5 text-gray-300">
+                  <li><strong>Hash-Only Storage:</strong> Face verification creates encrypted hash signatures only - NO photos or videos stored</li>
+                  <li><strong>Live Detection Only:</strong> Real-time face movement verification for multi-account prevention</li>
+                  <li><strong>Device Fingerprinting:</strong> Creates unique device hash identifiers to prevent duplicate accounts</li>
+                  <li><strong>No Biometric Retention:</strong> Facial data processed instantly and converted to non-reversible hash codes</li>
+                  <li><strong>Encrypted Transmission:</strong> All hash data transmitted via TLS encryption</li>
+                </ul>
+                <p><strong>Data Risks & Platform Security:</strong></p>
+                <ul className="ml-3 list-disc space-y-0.5 text-gray-300">
+                  <li><strong>No 100% Security Guarantee:</strong> Platform may experience data breaches, server hacks, or security vulnerabilities</li>
+                  <li><strong>Database Risk:</strong> User account data, transaction history, and KYC hashes stored in databases that could be compromised</li>
+                  <li><strong>Third-Party Risk:</strong> Platform uses external services that may have their own security vulnerabilities</li>
+                  <li><strong>Data Breach Consequences:</strong> Personal information, transaction patterns, and account balances could be exposed</li>
+                  <li><strong>Identity Verification Risks:</strong> KYC process requires personal information that carries inherent privacy risks</li>
+                  <li><strong>No Insurance for Data Loss:</strong> Platform provides no insurance or compensation for data breaches or privacy violations</li>
+                </ul>
+                <p><strong>User Data Responsibility:</strong> By participating, you accept all data privacy risks and potential security breaches. We implement security measures but cannot guarantee complete protection.</p>
+              </div>
+            </div>
+
+            <Separator className="bg-gray-800" />
+
+            {/* Platform Mechanics */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-3 h-3 text-white" />
                 <h3 className="text-sm font-bold text-white">Platform Mechanics & Business Model</h3>
               </div>
               <div className="text-white text-xs pl-5 space-y-1">
