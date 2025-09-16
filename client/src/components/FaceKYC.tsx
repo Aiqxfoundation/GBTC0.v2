@@ -13,7 +13,9 @@ import {
   ArrowLeft, 
   ArrowRight,
   Eye,
-  RotateCcw
+  RotateCcw,
+  Volume2,
+  VolumeX
 } from "lucide-react";
 
 interface FaceKYCProps {
@@ -57,41 +59,115 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const currentStepIndex = KYC_STEPS.findIndex(step => step.id === currentStep);
   const currentStepData = KYC_STEPS[currentStepIndex];
+
+  // Speech synthesis functionality
+  const speak = useCallback((text: string) => {
+    if (!speechSupported || isSpeaking) return;
+    
+    try {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.8;
+      utterance.pitch = 1;
+      utterance.volume = 0.8;
+      
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+      
+      window.speechSynthesis.speak(utterance);
+    } catch (error) {
+      console.error('Speech synthesis error:', error);
+      setIsSpeaking(false);
+    }
+  }, [speechSupported, isSpeaking]);
+
+  // Stop current speech
+  const stopSpeech = useCallback(() => {
+    if (speechSupported) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
+  }, [speechSupported]);
+
+  // Check speech synthesis support
+  useEffect(() => {
+    const checkSpeechSupport = () => {
+      if ('speechSynthesis' in window) {
+        setSpeechSupported(true);
+        // Wait for voices to load
+        const voices = window.speechSynthesis.getVoices();
+        if (voices.length === 0) {
+          window.speechSynthesis.onvoiceschanged = () => {
+            setSpeechSupported(true);
+          };
+        }
+      }
+    };
+    
+    checkSpeechSupport();
+  }, []);
 
   // Initialize camera
   const initializeCamera = async () => {
     try {
       setError(null);
+      
+      // Check if getUserMedia is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setError('Camera access is not supported in this browser. Please use a modern browser like Chrome, Firefox, or Safari.');
+        return;
+      }
+
       const constraints = {
         video: {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          facingMode: 'user'
+          width: { ideal: 640, min: 320 },
+          height: { ideal: 480, min: 240 },
+          facingMode: 'user',
+          frameRate: { ideal: 30, min: 15 }
         },
         audio: false
       };
 
+      speak('Accessing your camera now. Please allow camera permissions when prompted.');
+      
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        await videoRef.current.play();
       }
 
       setCurrentStep('position-face');
       setProgress(10);
+      
+      // Speak initial instruction
+      setTimeout(() => {
+        speak('Great! Camera is now active. Please position your face in the center of the circle on the screen.');
+      }, 1000);
+      
     } catch (err: any) {
+      let errorMessage = '';
       if (err.name === 'NotAllowedError') {
-        setError('Camera access denied. Please allow camera permissions to continue with identity verification.');
+        errorMessage = 'Camera access denied. Please click the camera icon in your browser address bar and allow camera permissions, then try again.';
       } else if (err.name === 'NotFoundError') {
-        setError('No camera found. Please ensure your device has a working camera.');
+        errorMessage = 'No camera found. Please ensure your device has a working camera and try again.';
+      } else if (err.name === 'NotReadableError') {
+        errorMessage = 'Camera is already in use by another application. Please close other apps using the camera and try again.';
+      } else if (err.name === 'OverconstrainedError') {
+        errorMessage = 'Camera does not meet the required specifications. Please try with a different camera.';
       } else {
-        setError('Failed to access camera. Please check your camera permissions and try again.');
+        errorMessage = 'Failed to access camera. Please check your camera permissions and try again.';
       }
+      
+      setError(errorMessage);
+      speak(errorMessage);
     }
   };
 
@@ -153,20 +229,42 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
       setCurrentStep(nextStep.id);
       setProgress(((nextStepIndex) / KYC_STEPS.length) * 100);
 
+      // Speak the instruction for the next step
+      setTimeout(() => {
+        speak(nextStep.instruction);
+      }, 500);
+
       // Auto-advance certain steps after countdown
       if (['turn-left', 'turn-right', 'turn-up', 'turn-down', 'open-mouth', 'blink'].includes(nextStep.id)) {
         startCountdown();
       }
+      
+      // Trigger processing when reaching processing step
+      if (nextStep.id === 'processing') {
+        setTimeout(() => {
+          processKYC();
+        }, 1000);
+      }
     }
-  }, [currentStep, currentStepIndex, completedSteps]);
+  }, [currentStep, currentStepIndex, completedSteps, speak]);
 
   // Start countdown for timed steps
   const startCountdown = () => {
+    // Clear any existing timer
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
+    }
+    
+    speak('Get ready. Starting in 3, 2, 1...');
     setCountdown(3);
-    const timer = setInterval(() => {
+    countdownTimerRef.current = setInterval(() => {
       setCountdown(prev => {
         if (prev === null || prev <= 1) {
-          clearInterval(timer);
+          if (countdownTimerRef.current) {
+            clearInterval(countdownTimerRef.current);
+            countdownTimerRef.current = null;
+          }
+          speak('Perfect! Well done.');
           setTimeout(() => {
             completeStep();
             setCountdown(null);
@@ -183,6 +281,8 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
     setCurrentStep('processing');
     setIsProcessing(true);
     
+    speak('Excellent! All steps completed. Now processing your verification data. Please wait a moment.');
+    
     try {
       // Simulate processing time
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -191,12 +291,16 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
       setCurrentStep('complete');
       setProgress(100);
       
+      speak('Congratulations! Your identity verification is complete. You can now proceed to create your account.');
+      
       setTimeout(() => {
         onComplete(kycData);
       }, 1500);
       
     } catch (err) {
-      setError('Failed to process verification. Please try again.');
+      const errorMsg = 'Failed to process verification. Please try again.';
+      setError(errorMsg);
+      speak(errorMsg);
       setIsProcessing(false);
     }
   };
@@ -207,11 +311,16 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
-  }, []);
+    stopSpeech();
+  }, [stopSpeech]);
 
   useEffect(() => {
     return () => {
       stopCameraStream();
+      // Clean up countdown timer on unmount
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+      }
     };
   }, [stopCameraStream]);
 
@@ -222,22 +331,23 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
     }
   }, [currentStep, stopCameraStream]);
 
-  // Auto-advance position-face step
+  // Auto-advance position-face step with speech guidance
   useEffect(() => {
     if (currentStep === 'position-face') {
+      // Give user more time and verbal guidance
       const timer = setTimeout(() => {
-        completeStep();
-      }, 3000);
+        speak('If your face is properly centered in the circle, click the button to continue.');
+      }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [currentStep, completeStep]);
+  }, [currentStep, speak]);
 
-  // Auto-process when all steps are complete
-  useEffect(() => {
-    if (currentStep === 'blink' && completedSteps.has('blink')) {
-      setTimeout(processKYC, 1000);
-    }
-  }, [currentStep, completedSteps]);
+  // Remove this useEffect as processing is now handled in completeStep
+  // useEffect(() => {
+  //   if (currentStep === 'blink' && completedSteps.has('blink')) {
+  //     setTimeout(processKYC, 1000);
+  //   }
+  // }, [currentStep, completedSteps]);
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4">
@@ -265,6 +375,11 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
             <Eye className="h-4 w-4 text-[#f7931a]" />
             <AlertDescription className="text-[#f7931a]/90 text-sm">
               <strong>Privacy Protected:</strong> This process uses live detection only. No photos, videos, or biometric data are stored on our servers. All processing happens locally on your device.
+              {speechSupported && (
+                <span className="block mt-1 text-xs">
+                  🔊 Voice guidance is enabled to help you through the process.
+                </span>
+              )}
             </AlertDescription>
           </Alert>
 
@@ -288,16 +403,30 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
                 <h3 className="text-lg font-semibold text-white">Camera Access Required</h3>
                 <p className="text-gray-400 text-sm max-w-md mx-auto">
                   We need access to your camera to verify your identity. This ensures one account per person and prevents fraud. No images are stored.
+                  {speechSupported && (
+                    <span className="block mt-2 text-[#f7931a] text-xs">
+                      🔊 Voice instructions will guide you through each step.
+                    </span>
+                  )}
                 </p>
               </div>
-              <Button 
-                onClick={initializeCamera}
-                className="bg-[#f7931a] hover:bg-[#ff9416] text-black font-bold"
-                data-testid="button-enable-camera"
-              >
-                <Camera className="w-4 h-4 mr-2" />
-                Enable Camera
-              </Button>
+              <div className="space-y-3">
+                <Button 
+                  onClick={initializeCamera}
+                  className="bg-[#f7931a] hover:bg-[#ff9416] text-black font-bold"
+                  data-testid="button-enable-camera"
+                >
+                  <Camera className="w-4 h-4 mr-2" />
+                  Enable Camera & Start KYC
+                </Button>
+                
+                {speechSupported && (
+                  <p className="text-xs text-gray-500 flex items-center justify-center gap-1">
+                    <Volume2 className="w-3 h-3" />
+                    Voice guidance is available
+                  </p>
+                )}
+              </div>
             </div>
           )}
 
@@ -306,13 +435,34 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
             <div className="space-y-4">
               {/* Instruction */}
               <div className="text-center">
-                <h3 className="text-lg font-semibold text-white mb-2">
-                  {currentStepData?.instruction}
-                </h3>
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <h3 className="text-lg font-semibold text-white">
+                    {currentStepData?.instruction}
+                  </h3>
+                  {speechSupported && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => speak(currentStepData?.instruction || '')}
+                      disabled={isSpeaking}
+                      className="h-6 w-6 p-1 text-[#f7931a] hover:bg-[#f7931a]/20"
+                      data-testid="button-repeat-instruction"
+                    >
+                      {isSpeaking ? (
+                        <VolumeX className="w-3 h-3" />
+                      ) : (
+                        <Volume2 className="w-3 h-3" />
+                      )}
+                    </Button>
+                  )}
+                </div>
                 {countdown !== null && (
                   <div className="text-2xl font-bold text-[#f7931a]">
                     {countdown > 0 ? countdown : "✓"}
                   </div>
+                )}
+                {isSpeaking && (
+                  <p className="text-xs text-[#f7931a] mt-1">🔊 Speaking...</p>
                 )}
               </div>
 
@@ -353,7 +503,7 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
 
               {/* Manual Controls for position-face */}
               {currentStep === 'position-face' && (
-                <div className="text-center">
+                <div className="text-center space-y-2">
                   <Button 
                     onClick={completeStep}
                     className="bg-[#f7931a] hover:bg-[#ff9416] text-black"
@@ -362,6 +512,9 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
                     <CheckCircle className="w-4 h-4 mr-2" />
                     My Face is Centered
                   </Button>
+                  <p className="text-xs text-gray-400">
+                    Position your face inside the circle and click when ready
+                  </p>
                 </div>
               )}
             </div>
@@ -414,6 +567,12 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
             
             {currentStep === 'complete' && (
               <Button
+                onClick={() => {
+                  // Fallback in case auto-advance doesn't work
+                  if (completedSteps.size > 0) {
+                    onComplete({ deviceFingerprint: '', verificationHash: '' });
+                  }
+                }}
                 className="bg-[#f7931a] hover:bg-[#ff9416] text-black font-bold"
                 data-testid="button-kyc-continue"
               >
