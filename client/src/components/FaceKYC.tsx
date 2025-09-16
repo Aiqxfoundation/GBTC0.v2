@@ -120,50 +120,72 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
       
       // Check if getUserMedia is supported
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setError('Camera access is not supported in this browser. Please use a modern browser like Chrome, Firefox, or Safari.');
+        setError('Camera access is not supported in this browser. Please use a modern browser.');
         return;
       }
 
+      speak('Starting camera access. Please allow permissions when prompted.');
+      
+      // Simpler, more compatible constraints
       const constraints = {
         video: {
-          width: { ideal: 640, min: 320 },
-          height: { ideal: 480, min: 240 },
-          facingMode: 'user',
-          frameRate: { ideal: 30, min: 15 }
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: 'user'
         },
         audio: false
       };
 
-      speak('Accessing your camera now. Please allow camera permissions when prompted.');
-      
+      console.log('Requesting camera access...');
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      console.log('Camera stream obtained:', stream);
+      
       streamRef.current = stream;
       
       if (videoRef.current) {
+        console.log('Assigning stream to video element...');
         videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+        
+        // Ensure video loads and plays
+        videoRef.current.onloadedmetadata = () => {
+          console.log('Video metadata loaded, playing video...');
+          if (videoRef.current) {
+            videoRef.current.play().then(() => {
+              console.log('Video is now playing');
+              setCurrentStep('position-face');
+              setProgress(10);
+              
+              // Speak initial instruction
+              setTimeout(() => {
+                speak('Perfect! Your camera is working. Position your face in the center of the circle.');
+              }, 1000);
+            }).catch(err => {
+              console.error('Error playing video:', err);
+              setError('Failed to start video playback. Please refresh and try again.');
+            });
+          }
+        };
+        
+        videoRef.current.onerror = (e) => {
+          console.error('Video element error:', e);
+          setError('Video playback error. Please refresh and try again.');
+        };
+      } else {
+        console.error('Video element not found');
+        setError('Video element not ready. Please try again.');
       }
-
-      setCurrentStep('position-face');
-      setProgress(10);
-      
-      // Speak initial instruction
-      setTimeout(() => {
-        speak('Great! Camera is now active. Please position your face in the center of the circle on the screen.');
-      }, 1000);
       
     } catch (err: any) {
+      console.error('Camera initialization error:', err);
       let errorMessage = '';
       if (err.name === 'NotAllowedError') {
-        errorMessage = 'Camera access denied. Please click the camera icon in your browser address bar and allow camera permissions, then try again.';
+        errorMessage = 'Camera permission denied. Please allow camera access and try again.';
       } else if (err.name === 'NotFoundError') {
-        errorMessage = 'No camera found. Please ensure your device has a working camera and try again.';
+        errorMessage = 'No camera found. Please ensure your device has a camera.';
       } else if (err.name === 'NotReadableError') {
-        errorMessage = 'Camera is already in use by another application. Please close other apps using the camera and try again.';
-      } else if (err.name === 'OverconstrainedError') {
-        errorMessage = 'Camera does not meet the required specifications. Please try with a different camera.';
+        errorMessage = 'Camera is busy. Please close other apps using the camera.';
       } else {
-        errorMessage = 'Failed to access camera. Please check your camera permissions and try again.';
+        errorMessage = 'Camera access failed. Please refresh and try again.';
       }
       
       setError(errorMessage);
@@ -352,36 +374,19 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4">
       <Card className="w-full max-w-2xl border-[#f7931a]/20 bg-gray-950">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl text-white flex items-center justify-center gap-3">
-            <Shield className="w-6 h-6 text-[#f7931a]" />
-            Identity Verification (KYC)
+        <CardHeader className="text-center pb-2">
+          <CardTitle className="text-xl text-white flex items-center justify-center gap-2">
+            <Shield className="w-5 h-5 text-[#f7931a]" />
+            Face Verification
           </CardTitle>
-          <div className="space-y-2">
-            <Progress 
-              value={progress} 
-              className="w-full h-2 bg-gray-800" 
-              data-testid="kyc-progress"
-            />
-            <p className="text-sm text-gray-400">
-              Step {currentStepIndex + 1} of {KYC_STEPS.length}: {currentStepData?.title}
-            </p>
-          </div>
+          <Progress 
+            value={progress} 
+            className="w-full h-1 bg-gray-800 mt-2" 
+            data-testid="kyc-progress"
+          />
         </CardHeader>
 
-        <CardContent className="space-y-6">
-          {/* Privacy Notice */}
-          <Alert className="border-[#f7931a]/40 bg-[#f7931a]/5">
-            <Eye className="h-4 w-4 text-[#f7931a]" />
-            <AlertDescription className="text-[#f7931a]/90 text-sm">
-              <strong>Privacy Protected:</strong> This process uses live detection only. No photos, videos, or biometric data are stored on our servers. All processing happens locally on your device.
-              {speechSupported && (
-                <span className="block mt-1 text-xs">
-                  🔊 Voice guidance is enabled to help you through the process.
-                </span>
-              )}
-            </AlertDescription>
-          </Alert>
+        <CardContent className="space-y-4">
 
           {/* Error Alert */}
           {error && (
@@ -402,28 +407,24 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
               <div className="space-y-2">
                 <h3 className="text-lg font-semibold text-white">Camera Access Required</h3>
                 <p className="text-gray-400 text-sm max-w-md mx-auto">
-                  We need access to your camera to verify your identity. This ensures one account per person and prevents fraud. No images are stored.
-                  {speechSupported && (
-                    <span className="block mt-2 text-[#f7931a] text-xs">
-                      🔊 Voice instructions will guide you through each step.
-                    </span>
-                  )}
+                  We need your camera to verify your identity. No photos are stored - everything happens live.
                 </p>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <Button 
                   onClick={initializeCamera}
-                  className="bg-[#f7931a] hover:bg-[#ff9416] text-black font-bold"
+                  size="lg"
+                  className="bg-[#f7931a] hover:bg-[#ff9416] text-black font-bold px-8 py-4 text-lg"
                   data-testid="button-enable-camera"
                 >
-                  <Camera className="w-4 h-4 mr-2" />
-                  Enable Camera & Start KYC
+                  <Camera className="w-6 h-6 mr-3" />
+                  Start Face Verification
                 </Button>
                 
                 {speechSupported && (
-                  <p className="text-xs text-gray-500 flex items-center justify-center gap-1">
-                    <Volume2 className="w-3 h-3" />
-                    Voice guidance is available
+                  <p className="text-sm text-[#f7931a] flex items-center justify-center gap-2">
+                    <Volume2 className="w-4 h-4" />
+                    Voice guidance enabled
                   </p>
                 )}
               </div>
@@ -432,89 +433,89 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
 
           {/* Camera View */}
           {currentStep !== 'camera-permission' && currentStep !== 'complete' && (
-            <div className="space-y-4">
-              {/* Instruction */}
+            <div className="space-y-6">
+              {/* Simple Instruction */}
               <div className="text-center">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <h3 className="text-lg font-semibold text-white">
-                    {currentStepData?.instruction}
-                  </h3>
-                  {speechSupported && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => speak(currentStepData?.instruction || '')}
-                      disabled={isSpeaking}
-                      className="h-6 w-6 p-1 text-[#f7931a] hover:bg-[#f7931a]/20"
-                      data-testid="button-repeat-instruction"
-                    >
-                      {isSpeaking ? (
-                        <VolumeX className="w-3 h-3" />
-                      ) : (
-                        <Volume2 className="w-3 h-3" />
-                      )}
-                    </Button>
-                  )}
-                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">
+                  {currentStepData?.instruction}
+                </h2>
                 {countdown !== null && (
-                  <div className="text-2xl font-bold text-[#f7931a]">
+                  <div className="text-4xl font-bold text-[#f7931a] mb-2">
                     {countdown > 0 ? countdown : "✓"}
                   </div>
                 )}
-                {isSpeaking && (
-                  <p className="text-xs text-[#f7931a] mt-1">🔊 Speaking...</p>
+                {speechSupported && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => speak(currentStepData?.instruction || '')}
+                    disabled={isSpeaking}
+                    className="text-[#f7931a] hover:bg-[#f7931a]/20"
+                    data-testid="button-repeat-instruction"
+                  >
+                    {isSpeaking ? (
+                      <VolumeX className="w-4 h-4 mr-2" />
+                    ) : (
+                      <Volume2 className="w-4 h-4 mr-2" />
+                    )}
+                    {isSpeaking ? 'Speaking...' : 'Repeat'}
+                  </Button>
                 )}
               </div>
 
-              {/* Video Feed */}
-              <div className="relative bg-black rounded-lg overflow-hidden border-2 border-[#f7931a]/20">
-                <video
-                  ref={videoRef}
-                  className="w-full aspect-video object-cover"
-                  autoPlay
-                  playsInline
-                  muted
-                  data-testid="kyc-video"
-                />
-                
-                {/* Face Guide Overlay */}
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="w-64 h-64 border-2 border-[#f7931a] rounded-full opacity-30"></div>
-                </div>
+              {/* Large Camera Circle */}
+              <div className="flex justify-center">
+                <div className="relative w-96 h-96 rounded-full overflow-hidden border-4 border-[#f7931a] bg-black">
+                  <video
+                    ref={videoRef}
+                    className="w-full h-full object-cover scale-110"
+                    autoPlay
+                    playsInline
+                    muted
+                    data-testid="kyc-video"
+                    style={{
+                      transform: 'scaleX(-1) scale(1.1)', // Mirror and zoom slightly
+                      filter: 'contrast(1.1) brightness(1.05)'
+                    }}
+                  />
+                  
+                  {/* Centered Guide Circle */}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-80 h-80 border-2 border-[#f7931a] rounded-full opacity-50"></div>
+                  </div>
 
-                {/* Status Indicator */}
-                <div className="absolute top-4 right-4">
-                  <Badge 
-                    className={`${
-                      completedSteps.has(currentStep) 
-                        ? "bg-green-600 text-white" 
-                        : "bg-[#f7931a] text-black"
-                    }`}
-                  >
-                    {completedSteps.has(currentStep) ? (
-                      <CheckCircle className="w-3 h-3 mr-1" />
-                    ) : (
-                      <Circle className="w-3 h-3 mr-1" />
-                    )}
-                    {completedSteps.has(currentStep) ? "Complete" : "In Progress"}
-                  </Badge>
+                  {/* Status Badge */}
+                  <div className="absolute top-4 right-4">
+                    <Badge 
+                      className={`${
+                        completedSteps.has(currentStep) 
+                          ? "bg-green-600 text-white" 
+                          : "bg-[#f7931a] text-black"
+                      }`}
+                    >
+                      {completedSteps.has(currentStep) ? (
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                      ) : (
+                        <Circle className="w-4 h-4 mr-1" />
+                      )}
+                      {completedSteps.has(currentStep) ? "✓" : "◯"}
+                    </Badge>
+                  </div>
                 </div>
               </div>
 
-              {/* Manual Controls for position-face */}
+              {/* Simple Controls */}
               {currentStep === 'position-face' && (
-                <div className="text-center space-y-2">
+                <div className="text-center">
                   <Button 
                     onClick={completeStep}
-                    className="bg-[#f7931a] hover:bg-[#ff9416] text-black"
+                    size="lg"
+                    className="bg-[#f7931a] hover:bg-[#ff9416] text-black font-bold px-8 py-3"
                     data-testid="button-face-positioned"
                   >
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    My Face is Centered
+                    <CheckCircle className="w-5 h-5 mr-2" />
+                    I'm Ready - Continue
                   </Button>
-                  <p className="text-xs text-gray-400">
-                    Position your face inside the circle and click when ready
-                  </p>
                 </div>
               )}
             </div>
