@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import * as faceapi from 'face-api.js';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -66,6 +67,9 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const detectionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const frameRef = useRef<ImageData | null>(null);
+  const [faceApiLoaded, setFaceApiLoaded] = useState(false);
+  const [faceDetected, setFaceDetected] = useState(false);
+  const [faceConfidence, setFaceConfidence] = useState(0);
 
   const currentStepIndex = KYC_STEPS.findIndex(step => step.id === currentStep);
   const currentStepData = KYC_STEPS[currentStepIndex];
@@ -99,6 +103,26 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
     }
   }, [speechSupported]);
 
+  // Load Face-API models
+  useEffect(() => {
+    const loadFaceApiModels = async () => {
+      try {
+        // Load face detection models from CDN
+        await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api@latest/model');
+        await faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api@latest/model');
+        await faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api@latest/model');
+        console.log('Face-API models loaded successfully');
+        setFaceApiLoaded(true);
+      } catch (error) {
+        console.error('Failed to load Face-API models:', error);
+        // Fallback: still allow KYC but with warnings
+        setFaceApiLoaded(false);
+      }
+    };
+    
+    loadFaceApiModels();
+  }, []);
+  
   // Check speech synthesis support
   useEffect(() => {
     const checkSpeechSupport = () => {
@@ -352,56 +376,109 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
     }
   }, [currentStep, stopCameraStream]);
 
-  // Face detection function
-  const detectFaceMovement = useCallback(() => {
-    if (!videoRef.current || !canvasRef.current) return false;
-    
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return false;
-    
-    // Set canvas size to match video
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-    
-    // Draw current frame
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    
-    // Get image data for analysis
-    const currentFrame = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    
-    // Basic motion detection
-    if (frameRef.current) {
-      let diffPixels = 0;
-      const threshold = 30;
-      const totalPixels = currentFrame.data.length / 4;
-      
-      for (let i = 0; i < currentFrame.data.length; i += 4) {
-        const currentR = currentFrame.data[i];
-        const currentG = currentFrame.data[i + 1];
-        const currentB = currentFrame.data[i + 2];
-        
-        const prevR = frameRef.current.data[i];
-        const prevG = frameRef.current.data[i + 1];
-        const prevB = frameRef.current.data[i + 2];
-        
-        const diff = Math.abs(currentR - prevR) + Math.abs(currentG - prevG) + Math.abs(currentB - prevB);
-        
-        if (diff > threshold) {
-          diffPixels++;
-        }
-      }
-      
-      const motionPercentage = (diffPixels / totalPixels) * 100;
-      frameRef.current = currentFrame;
-      
-      return motionPercentage > 0.5; // Motion detected if >0.5% pixels changed
+  // Real face detection function using Face-API
+  const detectRealFace = useCallback(async () => {
+    if (!videoRef.current || !canvasRef.current || !faceApiLoaded) {
+      return { faceDetected: false, confidence: 0, movement: false };
     }
     
-    frameRef.current = currentFrame;
-    return false;
-  }, []);
+    try {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return { faceDetected: false, confidence: 0, movement: false };
+      
+      // Set canvas size to match video
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      
+      // Draw current frame
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // Detect faces using Face-API
+      const detections = await faceapi.detectAllFaces(canvas, new faceapi.TinyFaceDetectorOptions({
+        inputSize: 416,
+        scoreThreshold: 0.5
+      })).withFaceLandmarks();
+      
+      if (detections.length === 0) {
+        setFaceDetected(false);
+        setFaceConfidence(0);
+        return { faceDetected: false, confidence: 0, movement: false };
+      }
+      
+      // Get the best detection (highest confidence)
+      const bestDetection = detections.reduce((best, current) => 
+        current.detection.score > best.detection.score ? current : best
+      );
+      
+      const confidence = bestDetection.detection.score;
+      const box = bestDetection.detection.box;
+      
+      // Check if face is well-positioned (centered and appropriate size)
+      const centerX = box.x + box.width / 2;
+      const centerY = box.y + box.height / 2;
+      const videoCenterX = canvas.width / 2;
+      const videoCenterY = canvas.height / 2;
+      
+      const distanceFromCenter = Math.sqrt(
+        Math.pow(centerX - videoCenterX, 2) + Math.pow(centerY - videoCenterY, 2)
+      );
+      
+      const maxAllowedDistance = Math.min(canvas.width, canvas.height) * 0.2; // 20% of frame
+      const isWellPositioned = distanceFromCenter < maxAllowedDistance;
+      
+      // Check face size (should be at least 15% of frame width)
+      const minFaceSize = canvas.width * 0.15;
+      const isSizeGood = box.width > minFaceSize && box.height > minFaceSize;
+      
+      // Motion detection for movement steps
+      let hasMovement = false;
+      if (frameRef.current) {
+        const currentFrame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        let diffPixels = 0;
+        const threshold = 25;
+        const totalPixels = currentFrame.data.length / 4;
+        
+        for (let i = 0; i < currentFrame.data.length; i += 4) {
+          const currentR = currentFrame.data[i];
+          const currentG = currentFrame.data[i + 1];
+          const currentB = currentFrame.data[i + 2];
+          
+          const prevR = frameRef.current.data[i];
+          const prevG = frameRef.current.data[i + 1];
+          const prevB = frameRef.current.data[i + 2];
+          
+          const diff = Math.abs(currentR - prevR) + Math.abs(currentG - prevG) + Math.abs(currentB - prevB);
+          
+          if (diff > threshold) {
+            diffPixels++;
+          }
+        }
+        
+        const motionPercentage = (diffPixels / totalPixels) * 100;
+        hasMovement = motionPercentage > 0.3;
+        frameRef.current = currentFrame;
+      } else {
+        frameRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      }
+      
+      const faceIsValid = confidence > 0.7 && isWellPositioned && isSizeGood;
+      setFaceDetected(faceIsValid);
+      setFaceConfidence(confidence);
+      
+      return {
+        faceDetected: faceIsValid,
+        confidence: confidence,
+        movement: hasMovement,
+        position: { centerX, centerY, width: box.width, height: box.height }
+      };
+      
+    } catch (error) {
+      console.error('Face detection error:', error);
+      return { faceDetected: false, confidence: 0, movement: false };
+    }
+  }, [faceApiLoaded]);
   
   // Start face detection for current step
   const startFaceDetection = useCallback(() => {
@@ -417,18 +494,29 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
     
     speak(currentStepData?.instruction || '');
     
-    detectionTimerRef.current = setInterval(() => {
-      const hasMotion = detectFaceMovement();
+    detectionTimerRef.current = setInterval(async () => {
+      const faceResult = await detectRealFace();
       
       if (currentStep === 'position-face') {
-        // For positioning, just track time (assuming face is in frame)
-        progress += incrementPerTick;
-      } else if (['turn-left', 'turn-right', 'turn-up', 'turn-down', 'open-mouth', 'blink'].includes(currentStep)) {
-        // For movements, require motion detection
-        if (hasMotion) {
-          progress += incrementPerTick * 1.5; // Faster progress with motion
+        // For positioning, require valid face detection
+        if (faceResult.faceDetected) {
+          progress += incrementPerTick * 2; // Faster when face is properly detected
         } else {
-          progress += incrementPerTick * 0.3; // Slower progress without motion
+          progress += incrementPerTick * 0.1; // Very slow without valid face
+          // Reset progress if no face for too long
+          if (progress > 30 && !faceResult.faceDetected) {
+            progress = Math.max(0, progress - incrementPerTick * 0.5);
+          }
+        }
+      } else if (['turn-left', 'turn-right', 'turn-up', 'turn-down', 'open-mouth', 'blink'].includes(currentStep)) {
+        // For movements, require both valid face AND movement
+        if (faceResult.faceDetected && faceResult.movement) {
+          progress += incrementPerTick * 2; // Fast progress with face + movement
+        } else if (faceResult.faceDetected && !faceResult.movement) {
+          progress += incrementPerTick * 0.2; // Slow progress with face but no movement
+        } else {
+          // No valid face detected - reset progress
+          progress = Math.max(0, progress - incrementPerTick * 0.3);
         }
       }
       
@@ -449,7 +537,7 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
         }, 500);
       }
     }, interval);
-  }, [currentStep, currentStepData, isDetecting, detectFaceMovement, completeStep, speak]);
+  }, [currentStep, currentStepData, isDetecting, detectRealFace, completeStep, speak]);
   
   // Auto-start detection when step changes
   useEffect(() => {
@@ -632,12 +720,34 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
                       </span>
                     </div>
                   </div>
-                  <p className="text-sm text-gray-400">
-                    {currentStep === 'position-face' 
-                      ? 'Keep your face centered in the circle'
-                      : 'Follow the instruction - movement detected automatically'
-                    }
-                  </p>
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-400">
+                      {currentStep === 'position-face' 
+                        ? 'Keep your face centered in the circle'
+                        : 'Follow the instruction - movement detected automatically'
+                      }
+                    </p>
+                    {faceApiLoaded && (
+                      <div className="flex items-center justify-center gap-4 text-xs">
+                        <div className={`flex items-center gap-1 ${
+                          faceDetected ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          <div className={`w-2 h-2 rounded-full ${
+                            faceDetected ? 'bg-green-400' : 'bg-red-400'
+                          }`} />
+                          Face: {faceDetected ? 'Detected' : 'Not Found'}
+                        </div>
+                        <div className="text-gray-500">
+                          Confidence: {Math.round(faceConfidence * 100)}%
+                        </div>
+                      </div>
+                    )}
+                    {!faceApiLoaded && (
+                      <p className="text-xs text-yellow-400">
+                        Loading face detection models...
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
