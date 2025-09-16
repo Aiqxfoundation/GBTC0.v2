@@ -126,70 +126,92 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
 
       speak('Starting camera access. Please allow permissions when prompted.');
       
-      // Simpler, more compatible constraints
-      const constraints = {
-        video: {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          facingMode: 'user'
-        },
-        audio: false
-      };
+      // First change step to render video element
+      setCurrentStep('position-face');
+      setProgress(10);
+      
+      // Wait for video element to render then initialize camera
+      setTimeout(async () => {
+        try {
+          // Simpler, more compatible constraints
+          const constraints = {
+            video: {
+              width: { ideal: 640 },
+              height: { ideal: 480 },
+              facingMode: 'user'
+            },
+            audio: false
+          };
 
-      console.log('Requesting camera access...');
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      console.log('Camera stream obtained:', stream);
-      
-      streamRef.current = stream;
-      
-      if (videoRef.current) {
-        console.log('Assigning stream to video element...');
-        videoRef.current.srcObject = stream;
-        
-        // Ensure video loads and plays
-        videoRef.current.onloadedmetadata = () => {
-          console.log('Video metadata loaded, playing video...');
+          console.log('Requesting camera access...');
+          const stream = await navigator.mediaDevices.getUserMedia(constraints);
+          console.log('Camera stream obtained:', stream);
+          
+          streamRef.current = stream;
+          
           if (videoRef.current) {
-            videoRef.current.play().then(() => {
-              console.log('Video is now playing');
-              setCurrentStep('position-face');
-              setProgress(10);
-              
-              // Speak initial instruction
-              setTimeout(() => {
-                speak('Perfect! Your camera is working. Position your face in the center of the circle.');
-              }, 1000);
-            }).catch(err => {
-              console.error('Error playing video:', err);
-              setError('Failed to start video playback. Please refresh and try again.');
-            });
+            console.log('Assigning stream to video element...');
+            videoRef.current.srcObject = stream;
+            
+            // Ensure video loads and plays
+            videoRef.current.onloadedmetadata = () => {
+              console.log('Video metadata loaded, playing video...');
+              if (videoRef.current) {
+                videoRef.current.play().then(() => {
+                  console.log('Video is now playing');
+                  
+                  // Speak initial instruction
+                  setTimeout(() => {
+                    speak('Perfect! Your camera is working. Position your face in the center of the circle.');
+                  }, 1000);
+                }).catch(err => {
+                  console.error('Error playing video:', err);
+                  setError('Failed to start video playback. Please refresh and try again.');
+                });
+              }
+            };
+            
+            videoRef.current.onerror = (e) => {
+              console.error('Video element error:', e);
+              setError('Video playback error. Please refresh and try again.');
+            };
+          } else {
+            console.error('Video element not found');
+            setError('Video element not ready. Please try again.');
+            // Stop the camera stream before resetting
+            if (streamRef.current) {
+              streamRef.current.getTracks().forEach(track => track.stop());
+              streamRef.current = null;
+            }
+            // Reset to camera permission step if video element not found
+            setCurrentStep('camera-permission');
+            setProgress(0);
           }
-        };
-        
-        videoRef.current.onerror = (e) => {
-          console.error('Video element error:', e);
-          setError('Video playback error. Please refresh and try again.');
-        };
-      } else {
-        console.error('Video element not found');
-        setError('Video element not ready. Please try again.');
-      }
+        } catch (err: any) {
+          console.error('Camera initialization error:', err);
+          let errorMessage = '';
+          if (err.name === 'NotAllowedError') {
+            errorMessage = 'Camera permission denied. Please allow camera access and try again.';
+          } else if (err.name === 'NotFoundError') {
+            errorMessage = 'No camera found. Please ensure your device has a camera.';
+          } else if (err.name === 'NotReadableError') {
+            errorMessage = 'Camera is busy. Please close other apps using the camera.';
+          } else {
+            errorMessage = 'Camera access failed. Please refresh and try again.';
+          }
+          
+          setError(errorMessage);
+          speak(errorMessage);
+          // Reset to camera permission step on error
+          setCurrentStep('camera-permission');
+          setProgress(0);
+        }
+      }, 150); // Small delay to ensure video element is rendered
       
     } catch (err: any) {
-      console.error('Camera initialization error:', err);
-      let errorMessage = '';
-      if (err.name === 'NotAllowedError') {
-        errorMessage = 'Camera permission denied. Please allow camera access and try again.';
-      } else if (err.name === 'NotFoundError') {
-        errorMessage = 'No camera found. Please ensure your device has a camera.';
-      } else if (err.name === 'NotReadableError') {
-        errorMessage = 'Camera is busy. Please close other apps using the camera.';
-      } else {
-        errorMessage = 'Camera access failed. Please refresh and try again.';
-      }
-      
-      setError(errorMessage);
-      speak(errorMessage);
+      console.error('Initial camera setup error:', err);
+      setError('Failed to initialize camera setup. Please refresh and try again.');
+      speak('Failed to initialize camera setup. Please refresh and try again.');
     }
   };
 
