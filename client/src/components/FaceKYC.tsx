@@ -61,7 +61,11 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [speechSupported, setSpeechSupported] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [detectionProgress, setDetectionProgress] = useState(0);
+  const [isDetecting, setIsDetecting] = useState(false);
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const detectionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const frameRef = useRef<ImageData | null>(null);
 
   const currentStepIndex = KYC_STEPS.findIndex(step => step.id === currentStep);
   const currentStepData = KYC_STEPS[currentStepIndex];
@@ -278,10 +282,7 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
         speak(nextStep.instruction);
       }, 500);
 
-      // Auto-advance certain steps after countdown
-      if (['turn-left', 'turn-right', 'turn-up', 'turn-down', 'open-mouth', 'blink'].includes(nextStep.id)) {
-        startCountdown();
-      }
+      // Face detection will auto-start for movement steps
       
       // Trigger processing when reaching processing step
       if (nextStep.id === 'processing') {
@@ -292,33 +293,6 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
     }
   }, [currentStep, currentStepIndex, completedSteps, speak]);
 
-  // Start countdown for timed steps
-  const startCountdown = () => {
-    // Clear any existing timer
-    if (countdownTimerRef.current) {
-      clearInterval(countdownTimerRef.current);
-    }
-    
-    speak('Get ready. Starting in 3, 2, 1...');
-    setCountdown(3);
-    countdownTimerRef.current = setInterval(() => {
-      setCountdown(prev => {
-        if (prev === null || prev <= 1) {
-          if (countdownTimerRef.current) {
-            clearInterval(countdownTimerRef.current);
-            countdownTimerRef.current = null;
-          }
-          speak('Perfect! Well done.');
-          setTimeout(() => {
-            completeStep();
-            setCountdown(null);
-          }, 500);
-          return null;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
 
   // Process KYC completion
   const processKYC = async () => {
@@ -361,9 +335,12 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
   useEffect(() => {
     return () => {
       stopCameraStream();
-      // Clean up countdown timer on unmount
+      // Clean up all timers on unmount
       if (countdownTimerRef.current) {
         clearInterval(countdownTimerRef.current);
+      }
+      if (detectionTimerRef.current) {
+        clearInterval(detectionTimerRef.current);
       }
     };
   }, [stopCameraStream]);
@@ -375,16 +352,114 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
     }
   }, [currentStep, stopCameraStream]);
 
-  // Auto-advance position-face step with speech guidance
+  // Face detection function
+  const detectFaceMovement = useCallback(() => {
+    if (!videoRef.current || !canvasRef.current) return false;
+    
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return false;
+    
+    // Set canvas size to match video
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    
+    // Draw current frame
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    // Get image data for analysis
+    const currentFrame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    
+    // Basic motion detection
+    if (frameRef.current) {
+      let diffPixels = 0;
+      const threshold = 30;
+      const totalPixels = currentFrame.data.length / 4;
+      
+      for (let i = 0; i < currentFrame.data.length; i += 4) {
+        const currentR = currentFrame.data[i];
+        const currentG = currentFrame.data[i + 1];
+        const currentB = currentFrame.data[i + 2];
+        
+        const prevR = frameRef.current.data[i];
+        const prevG = frameRef.current.data[i + 1];
+        const prevB = frameRef.current.data[i + 2];
+        
+        const diff = Math.abs(currentR - prevR) + Math.abs(currentG - prevG) + Math.abs(currentB - prevB);
+        
+        if (diff > threshold) {
+          diffPixels++;
+        }
+      }
+      
+      const motionPercentage = (diffPixels / totalPixels) * 100;
+      frameRef.current = currentFrame;
+      
+      return motionPercentage > 0.5; // Motion detected if >0.5% pixels changed
+    }
+    
+    frameRef.current = currentFrame;
+    return false;
+  }, []);
+  
+  // Start face detection for current step
+  const startFaceDetection = useCallback(() => {
+    if (isDetecting) return;
+    
+    setIsDetecting(true);
+    setDetectionProgress(0);
+    
+    let progress = 0;
+    const targetTime = currentStep === 'position-face' ? 3000 : 4000; // 3s for positioning, 4s for movements
+    const interval = 100;
+    const incrementPerTick = (interval / targetTime) * 100;
+    
+    speak(currentStepData?.instruction || '');
+    
+    detectionTimerRef.current = setInterval(() => {
+      const hasMotion = detectFaceMovement();
+      
+      if (currentStep === 'position-face') {
+        // For positioning, just track time (assuming face is in frame)
+        progress += incrementPerTick;
+      } else if (['turn-left', 'turn-right', 'turn-up', 'turn-down', 'open-mouth', 'blink'].includes(currentStep)) {
+        // For movements, require motion detection
+        if (hasMotion) {
+          progress += incrementPerTick * 1.5; // Faster progress with motion
+        } else {
+          progress += incrementPerTick * 0.3; // Slower progress without motion
+        }
+      }
+      
+      progress = Math.min(progress, 100);
+      setDetectionProgress(progress);
+      
+      if (progress >= 100) {
+        if (detectionTimerRef.current) {
+          clearInterval(detectionTimerRef.current);
+          detectionTimerRef.current = null;
+        }
+        setIsDetecting(false);
+        setDetectionProgress(0);
+        
+        speak('Perfect! Well done.');
+        setTimeout(() => {
+          completeStep();
+        }, 500);
+      }
+    }, interval);
+  }, [currentStep, currentStepData, isDetecting, detectFaceMovement, completeStep, speak]);
+  
+  // Auto-start detection when step changes
   useEffect(() => {
-    if (currentStep === 'position-face') {
-      // Give user more time and verbal guidance
+    if (currentStep === 'position-face' || ['turn-left', 'turn-right', 'turn-up', 'turn-down', 'open-mouth', 'blink'].includes(currentStep)) {
       const timer = setTimeout(() => {
-        speak('If your face is properly centered in the circle, click the button to continue.');
-      }, 2000);
+        startFaceDetection();
+      }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [currentStep, speak]);
+  }, [currentStep, startFaceDetection]);
 
   // Remove this useEffect as processing is now handled in completeStep
   // useEffect(() => {
@@ -526,18 +601,43 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
                 </div>
               </div>
 
-              {/* Simple Controls */}
-              {currentStep === 'position-face' && (
-                <div className="text-center">
-                  <Button 
-                    onClick={completeStep}
-                    size="lg"
-                    className="bg-[#f7931a] hover:bg-[#ff9416] text-black font-bold px-8 py-3"
-                    data-testid="button-face-positioned"
-                  >
-                    <CheckCircle className="w-5 h-5 mr-2" />
-                    I'm Ready - Continue
-                  </Button>
+              {/* Auto-detection Progress */}
+              {isDetecting && (
+                <div className="text-center space-y-4">
+                  <div className="relative w-32 h-32 mx-auto">
+                    {/* Background circle */}
+                    <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 36 36">
+                      <path
+                        className="text-gray-700"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        fill="transparent"
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      />
+                      {/* Progress circle */}
+                      <path
+                        className="text-[#f7931a]"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        fill="transparent"
+                        strokeDasharray={`${detectionProgress}, 100`}
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      />
+                    </svg>
+                    {/* Progress text */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-2xl font-bold text-[#f7931a]">
+                        {Math.round(detectionProgress)}%
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-400">
+                    {currentStep === 'position-face' 
+                      ? 'Keep your face centered in the circle'
+                      : 'Follow the instruction - movement detected automatically'
+                    }
+                  </p>
                 </div>
               )}
             </div>
@@ -573,8 +673,8 @@ export default function FaceKYC({ onComplete, onBack }: FaceKYCProps) {
             </div>
           )}
 
-          {/* Hidden canvas for processing */}
-          <canvas ref={canvasRef} className="hidden" />
+          {/* Hidden canvas for face detection */}
+          <canvas ref={canvasRef} className="hidden" width="640" height="480" />
 
           {/* Navigation */}
           <div className="flex justify-between pt-4 border-t border-gray-800">
